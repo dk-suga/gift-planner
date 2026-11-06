@@ -2289,6 +2289,20 @@ document.addEventListener('submit',ev=>{
  if(!v17ExpenseEditId)db.expenses.push(saved);v17ExpenseEditId=null;modal=null;page='statistics';draw();window.v14Toast?.('✓ Расход сохранён в финансовом реестре.');
 },true);
 
+// Cloud settings override: previous visual versions replaced the original
+// cloud settings with an outdated local-storage description.
+const gpCloudSettingsBase = settings;
+settings=function(){
+ let html=gpCloudSettingsBase();
+ html=html.replace(/Данные пока хранятся в этом браузере\. Облачная синхронизация и TickTick ещё не подключены\./g,
+   'Личные записи синхронизируются через Firebase после подтверждения сохранения. Прямой TickTick OAuth пока не подключён.');
+ const cloudText=String(document.getElementById('gp-sync-bar')?.textContent||'Подключение к Firebase…');
+ const block=`<section class="v12-settings-section gp-settings-card"><h3>Firebase · сохранение и синхронизация</h3><p id="gp-cloud-info" class="muted small">${escapeHtml(cloudText)}</p><div class="gp-settings-actions"><button class="btn secondary" type="button" id="gp-sync-retry">↻ Проверить сохранение</button><button class="btn ghost" type="button" id="gp-diagnostics">↓ Диагностика</button><button class="btn ghost" type="button" id="gp-sign-out">Выйти</button></div><p class="muted small">Полный экспорт JSON содержит личную информацию — храни его у себя. Диагностика сохраняет только технические сведения. Если видишь ошибку сохранения, сначала экспортируй данные.</p></section>`;
+ return html.includes('<div class="v12-settings-foot">')
+   ?html.replace('<div class="v12-settings-foot">',block+'<div class="v12-settings-foot">')
+   :html+block;
+};
+
 // Consistent naming and no more than a single category badge in any profile header.
 draw();
 })();

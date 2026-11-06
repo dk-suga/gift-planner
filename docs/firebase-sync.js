@@ -135,17 +135,35 @@ async function initializeCloud(user){
       const sec=sections[i];const value=snapshot.exists()?snapshot.data()?.value:(sec==='settings'?{}:[]);
       const checked=sec==='settings'?(value&&typeof value==='object'&&!Array.isArray(value)?value:{}):(Array.isArray(value)?value:[]);
       const incoming=serial(checked);
-      if(incoming===lastValues[sec])return;
+      const remoteRevision=snapshot.exists()?Number(snapshot.data()?.revision||0):0;
       const local=window.GiftPlannerBridge.get();
       const localValue=serial(normalized(sec,local));
-      // Prefer safety to overwriting unsaved edits on this device.
-      if(pending[sec]||writeBusy && localValue!==lastValues[sec]){
-        conflict=true;status('⚠ Изменение на другом устройстве. Сохрани JSON и перезагрузи страницу для сверки.',true);
+      // Crucial: Firestore reports writes made by THIS tab back to its listener.
+      // They are confirmations, never conflicts from another device.
+      if(snapshot.data()?.client===sessionId){
+        if(remoteRevision>=Number(revisions[sec]||0)){
+          lastValues[sec]=incoming;
+          revisions[sec]=remoteRevision;
+        }
+        if(pending[sec] && serial(pending[sec])===incoming)delete pending[sec];
+        return;
+      }
+      if(incoming===lastValues[sec])return;
+      // If the local state already equals the remote value, acknowledge rather
+      // than flagging a conflict (possible after rapid navigation or reload).
+      if(localValue===incoming){
+        lastValues[sec]=incoming;
+        revisions[sec]=remoteRevision;
+        if(pending[sec])delete pending[sec];
+        return;
+      }
+      // Keep the local unsaved draft: NEVER silently overwrite it.
+      if(pending[sec]||(writeBusy && localValue!==lastValues[sec])){
+        conflict=true;status('⚠ Изменение на другом устройстве. Экспортируй JSON, затем обнови страницу для сверки.',true);
         return;
       }
       lastValues[sec]=incoming;
-      revisions[sec]=snapshot.exists()?Number(snapshot.data()?.revision||0):0;
-      if(localValue===incoming)return;
+      revisions[sec]=remoteRevision;
       const next=clone(local);
       if(sec==='settings')Object.assign(next,checked);else next[sec]=checked;
       window.GiftPlannerBridge.apply(next,{preserveUi:true});
@@ -189,8 +207,9 @@ async function flush(){
         transaction.set(reference,{value:clone(value),revision:current+1,updatedAt:storeSdk.serverTimestamp(),client:sessionId});
         return current+1;
       });
-      revisions[section]=nextRev;
+      revisions[section]=Math.max(Number(revisions[section]||0),nextRev);
       lastValues[section]=serial(value);
+      if(pending[section] && serial(pending[section])===lastValues[section])delete pending[section];
     }));
     if(currentUser?.uid===uid)status('✓ Сохранено в Firebase');
   }catch(e){
@@ -203,6 +222,15 @@ async function flush(){
   }
 }
 window.addEventListener('online',()=>{if(cloudReady&&Object.keys(pending).length)flush()});
+window.addEventListener('offline',()=>{if(cloudReady)status('⚠ Нет сети. Не закрывай страницу с несохранёнными изменениями.',true)});
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#gp-sync-retry'))return;
+  if(conflict){status('⚠ Конфликт: сначала сохрани JSON, затем обнови страницу.',true);return}
+  if(!cloudReady){status('⚠ Войди в приложение и проверь доступ к Firestore.',true);return}
+  // Re-scan the UI state instead of only retrying an old, stale queue.
+  queueSync(window.GiftPlannerBridge.get());
+  if(!writeBusy)flush();
+},true);
 window.addEventListener('pagehide',()=>{if(timer){clearTimeout(timer);flush()}});
 
 // Buttons inside application are re-created on each draw; event delegation persists.
@@ -220,7 +248,7 @@ document.addEventListener('click',async e=>{
       sections:Object.fromEntries(SECTIONS.map(k=>[k,{count:Array.isArray(data[k])?data[k].length:0}])),
       issues:{giftsWithoutPerson:(data.gifts||[]).filter(g=>g.status!=='idea'&&!g.personId&&!(g.recipientIds||[]).length).length,
         giftsWithoutEvent:(data.gifts||[]).filter(g=>g.status!=='idea'&&!g.eventId).length},
-      cloud:{connected:cloudReady,conflict},
+      cloud:{connected:cloudReady,conflict,projectId:firebaseConfig.projectId,authSignedIn:!!currentUser,pendingSections:Object.keys(pending).length,writeBusy,status:bar?.textContent||''},
       note:'No names, birthdays, preferences, links, notes, passwords or gift names are included.'};
     downloadJson(diagnostics,'gift-planner-diagnostics.json');
   }

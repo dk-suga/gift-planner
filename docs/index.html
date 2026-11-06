@@ -332,7 +332,38 @@ body.dark .v17-summary-card.lavender{background:#392e49}body.dark .v17-summary-c
 
 @media(max-width:800px){.mobile-nav{z-index:50!important;isolation:isolate}.mobile-nav button{position:relative;z-index:1;min-height:48px;pointer-events:auto}}
 
-</style><link rel="stylesheet" href="./cloud-ui.css"><script>window.giftCloudMode=true;window.giftCloudApplying=false;</script></head><body data-cloud-status="loading"><div id="root"></div><div id="cloud-gate" class="gp-gate" role="dialog" aria-modal="true" aria-labelledby="gp-gate-title"><div class="gp-gate-card"><div class="gp-gate-icon">🎁</div><h1 id="gp-gate-title">Gift Planner</h1><p id="gp-gate-description">Подключаю личное пространство…</p><div id="gp-login-fields" hidden><label>Email<input type="email" id="gp-login-email" autocomplete="username" placeholder="Твой email"></label><label>Пароль<input type="password" id="gp-login-pass" autocomplete="current-password" placeholder="Пароль входа в приложение"></label><button id="gp-login-btn" type="button">Войти</button></div><div class="gp-gate-actions"><button id="gp-retry" type="button" hidden>Повторить</button><button id="gp-demo" type="button" hidden aria-hidden="true">Демо</button></div><p id="gp-gate-error" role="alert" hidden></p></div></div><div id="gp-sync-bar" class="gp-sync-bar" role="status" aria-live="polite" hidden></div><script>
+</style><link rel="stylesheet" href="./cloud-ui.css">
+<style id="gp-people-badge-clip-fix">
+/* Gift Planner: never clip name/category badges in responsive person cards. */
+.v14-person-card .item-main { min-width: 0; max-width: 100%; }
+.v14-person-card .item-main strong {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  column-gap: 9px !important;
+  row-gap: 6px !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  max-width: 100%;
+  line-height: 1.3 !important;
+}
+.v14-person-card .item-main .v14-category {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 1 auto;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0 !important;
+  padding: 6px 13px !important;
+  white-space: normal !important;
+  overflow-wrap: break-word;
+  text-align: center;
+  line-height: 1.25 !important;
+}
+</style>
+<script>window.giftCloudMode=true;window.giftCloudApplying=false;</script></head><body data-cloud-status="loading"><div id="root"></div><div id="cloud-gate" class="gp-gate" role="dialog" aria-modal="true" aria-labelledby="gp-gate-title"><div class="gp-gate-card"><div class="gp-gate-icon">🎁</div><h1 id="gp-gate-title">Gift Planner</h1><p id="gp-gate-description">Подключаю личное пространство…</p><div id="gp-login-fields" hidden><label>Email<input type="email" id="gp-login-email" autocomplete="username" placeholder="Твой email"></label><label>Пароль<input type="password" id="gp-login-pass" autocomplete="current-password" placeholder="Пароль входа в приложение"></label><button id="gp-login-btn" type="button">Войти</button></div><div class="gp-gate-actions"><button id="gp-retry" type="button" hidden>Повторить</button><button id="gp-demo" type="button" hidden aria-hidden="true">Демо</button></div><p id="gp-gate-error" role="alert" hidden></p></div></div><div id="gp-sync-bar" class="gp-sync-bar" role="status" aria-live="polite" hidden></div><script>
 const KEY='gift-planner-lavender-v1', NAV=[['home','⌂','Главная'],['calendar','▦','Календарь'],['people','👥','Люди'],['gifts','🎁','Подарки'],['workshop','🧶','Мастерская'],['shopping','🛒','Покупки'],['settings','⚙','Настройки']];
 const NAV_ICONS={home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="m9 16 2 2 4-4"/>',people:'<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 11a3 3 0 1 0-1-6M18 14a5 5 0 0 1 3 5v1"/>',gifts:'<rect x="3" y="10" width="18" height="11" rx="2"/><path d="M2 7h20v4H2zM12 7v14M12 7c-5-1-7-3-6-5 2-3 6 1 6 5zm0 0c5-1 7-3 6-5-2-3-6 1-6 5z"/>',workshop:'<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8 8l13 12M8 16 21 4"/>',shopping:'<path d="M3 10h18l-2 11H5L3 10ZM8 10l4-7 4 7M9 14v3m6-3v3"/>',settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>',more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'};
 const navIcon=k=>`<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${NAV_ICONS[k]||NAV_ICONS.more}</svg>`;

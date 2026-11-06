@@ -1,0 +1,50 @@
+/* Three adaptive layouts: compact phone, iPad portrait/landscape, desktop */
+body[data-cloud-status="loading"] #root,body[data-cloud-status="login"] #root,body[data-cloud-status="setup"] #root,body[data-cloud-status="error"] #root{visibility:hidden;pointer-events:none}
+body[data-cloud-status="demo"] #root,body[data-cloud-status="ready"] #root{visibility:visible}
+.gp-gate{position:fixed;z-index:500;inset:0;min-height:100dvh;background:#faf9f6;display:grid;place-items:center;padding:24px;overflow-y:auto;color:#302a3c}
+body[data-cloud-status="demo"] .gp-gate,body[data-cloud-status="ready"] .gp-gate{display:none}
+.gp-gate-card{width:min(440px,100%);border:1px solid #e8e1ed;background:#fff;box-shadow:0 16px 48px #3d334a18;border-radius:25px;padding:32px;display:grid;gap:16px}
+.gp-gate-icon{font-size:36px;background:#eee7f8;width:68px;height:68px;border-radius:18px;display:grid;place-items:center}
+.gp-gate-card h1{font-size:29px;margin:0;line-height:1.1}.gp-gate-card p{color:#746b80;line-height:1.55;margin:0}
+#gp-login-fields:not([hidden]){display:grid;gap:12px}#gp-login-fields label{font-size:13px;font-weight:700;display:grid;gap:7px}#gp-login-fields input{font:inherit;border:1px solid #e0d7eb;background:#fff;color:#302a3c;border-radius:12px;padding:13px;min-height:48px;width:100%}
+#gp-login-fields button{border:0;border-radius:12px;padding:14px;background:#79639f;color:white;font-weight:750;min-height:48px}
+.gp-gate-actions{display:flex;gap:8px;flex-wrap:wrap}.gp-gate-actions button{background:#eee7f8;color:#79639f;border:0;border-radius:12px;padding:11px 12px;cursor:pointer;font-weight:650}
+#gp-gate-error:not([hidden]){color:#a94459;background:#fff0f1;padding:12px;border-radius:12px;font-size:13px}
+.gp-sync-bar{position:fixed;z-index:70;top:8px;right:12px;max-width:min(300px,55vw);padding:8px 13px;border-radius:13px;box-shadow:0 5px 14px #2d213120;background:#e5f1eb;color:#376e5a;font-weight:700;font-size:12px;pointer-events:none;overflow-wrap:anywhere}
+.gp-sync-bar.gp-warning{background:#fbf0df;color:#9b6b2b}
+.gp-settings-actions{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+/* iPhone narrow screens; meaningful content first, tap-friendly controls */
+@media(max-width:600px){
+ .main{padding:21px 14px calc(122px + env(safe-area-inset-bottom))!important}
+ .top{gap:10px}.top h1{font-size:26px;line-height:1.12}.top>.btn{font-size:12px;min-height:44px}
+ .grid:not(.four):not(.two),.grid.two{grid-template-columns:1fr!important}
+ .grid.four{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .mobile-nav{padding-bottom:calc(9px + env(safe-area-inset-bottom))!important}
+ .floating{bottom:calc(100px + env(safe-area-inset-bottom))!important;right:16px!important}
+ .modal-bg{padding:8px!important}.modal{width:100%!important;max-width:100%!important;max-height:calc(100dvh - 16px)!important;border-radius:20px!important;padding:18px!important}
+ .formgrid{grid-template-columns:1fr!important}.v17-finance-body,.v17-finance-grid{grid-template-columns:1fr!important}
+ .v17-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .v17-table-wrap{max-width:calc(100vw - 64px)}
+ button,.btn,input,select,textarea{touch-action:manipulation}button.btn{min-height:44px}
+}
+/* iPad portrait: bottom navigation, more spacious two-column layout */
+@media(min-width:601px) and (max-width:800px){
+ .main{padding:30px 27px 116px!important}
+ .grid.two{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .grid.four{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .modal{width:min(740px,95vw)!important}
+ .mobile-nav{padding-bottom:calc(8px + env(safe-area-inset-bottom))!important}
+}
+/* iPad landscape and small laptops: compact side navigation, no cramped three-column cards */
+@media(min-width:801px) and (max-width:1180px){
+ .sidebar{width:192px!important;padding:20px 9px!important}
+ .brand{font-size:16px!important;padding:2px 8px 24px!important}
+ .nav button{font-size:13px!important;padding:11px 8px!important}
+ .main{padding:30px 25px 90px!important}
+ .grid.four{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .grid:not(.two):not(.four){grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .v17-finance-body{grid-template-columns:1fr!important}
+}
+@media(min-width:1181px){.main{max-width:1300px!important}}
+@media(hover:none){button,select,input{min-height:44px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

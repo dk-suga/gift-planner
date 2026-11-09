@@ -363,7 +363,83 @@ body.dark .v17-summary-card.lavender{background:#392e49}body.dark .v17-summary-c
   line-height: 1.25 !important;
 }
 </style>
-<script>window.giftCloudMode=true;window.giftCloudApplying=false;</script></head><body data-cloud-status="loading"><div id="root"></div><div id="cloud-gate" class="gp-gate" role="dialog" aria-modal="true" aria-labelledby="gp-gate-title"><div class="gp-gate-card"><div class="gp-gate-icon">🎁</div><h1 id="gp-gate-title">Gift Planner</h1><p id="gp-gate-description">Подключаю личное пространство…</p><div id="gp-login-fields" hidden><label>Email<input type="email" id="gp-login-email" autocomplete="username" placeholder="Твой email"></label><label>Пароль<input type="password" id="gp-login-pass" autocomplete="current-password" placeholder="Пароль входа в приложение"></label><button id="gp-login-btn" type="button">Войти</button></div><div class="gp-gate-actions"><button id="gp-retry" type="button" hidden>Повторить</button><button id="gp-demo" type="button" hidden aria-hidden="true">Демо</button></div><p id="gp-gate-error" role="alert" hidden></p></div></div><div id="gp-sync-bar" class="gp-sync-bar" role="status" aria-live="polite" hidden></div><script>
+<script>window.giftCloudMode=true;window.giftCloudApplying=false;</script>
+<style id="gp-anniversary-responsive-fix">
+/* Native iOS/iPadOS date inputs must be allowed to shrink inside modal grids. */
+.modal-bg .modal,
+.modal-bg .modal .formgrid,
+.modal-bg .modal .formfield,
+.modal-bg .modal .formgrid > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.modal-bg .modal .formgrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.modal-bg .modal .field,
+.modal-bg .modal input[type="date"],
+.modal-bg .modal input[type="datetime-local"] {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.modal-bg .modal input[type="date"],
+.modal-bg .modal input[type="datetime-local"] {
+  -webkit-min-logical-width: 0;
+  font-size: max(16px, 1rem);
+}
+.gp-anniversary-second[hidden] { display: none !important; }
+.gp-anniversary-second { min-width: 0; }
+@media (max-width: 1250px) {
+  .modal-bg .modal .formgrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 800px) {
+  .modal-bg { padding: 12px; overflow: auto; align-items: center; }
+  .modal-bg .modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 24px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .modal-bg .modal .formgrid { grid-template-columns: minmax(0, 1fr); }
+  .modal-bg .modal .modal-actions { flex-wrap: wrap; }
+}
+</style>
+<style id="gp-iphone-login-center-fix">
+/* Use the visible iOS viewport, not the layout viewport, for the login overlay. */
+@media (max-width: 600px) {
+  .gp-gate {
+    position: fixed;
+    inset: 0 0 auto 0;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    max-height: 100dvh;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: max(16px, env(safe-area-inset-top), env(safe-area-inset-bottom)) 16px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .gp-gate-card {
+    width: min(440px, 100%);
+    max-width: 100%;
+    flex: 0 0 auto;
+    margin: auto 0;
+  }
+}
+</style></head><body data-cloud-status="loading"><div id="root"></div><div id="cloud-gate" class="gp-gate" role="dialog" aria-modal="true" aria-labelledby="gp-gate-title"><div class="gp-gate-card"><div class="gp-gate-icon">🎁</div><h1 id="gp-gate-title">Gift Planner</h1><p id="gp-gate-description">Подключаю личное пространство…</p><div id="gp-login-fields" hidden><label>Email<input type="email" id="gp-login-email" autocomplete="username" placeholder="Твой email"></label><label>Пароль<input type="password" id="gp-login-pass" autocomplete="current-password" placeholder="Пароль входа в приложение"></label><button id="gp-login-btn" type="button">Войти</button></div><div class="gp-gate-actions"><button id="gp-retry" type="button" hidden>Повторить</button><button id="gp-demo" type="button" hidden aria-hidden="true">Демо</button></div><p id="gp-gate-error" role="alert" hidden></p></div></div><div id="gp-sync-bar" class="gp-sync-bar" role="status" aria-live="polite" hidden></div><script>
 const KEY='gift-planner-lavender-v1', NAV=[['home','⌂','Главная'],['calendar','▦','Календарь'],['people','👥','Люди'],['gifts','🎁','Подарки'],['workshop','🧶','Мастерская'],['shopping','🛒','Покупки'],['settings','⚙','Настройки']];
 const NAV_ICONS={home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="m9 16 2 2 4-4"/>',people:'<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 11a3 3 0 1 0-1-6M18 14a5 5 0 0 1 3 5v1"/>',gifts:'<rect x="3" y="10" width="18" height="11" rx="2"/><path d="M2 7h20v4H2zM12 7v14M12 7c-5-1-7-3-6-5 2-3 6 1 6 5zm0 0c5-1 7-3 6-5-2-3-6 1-6 5z"/>',workshop:'<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8 8l13 12M8 16 21 4"/>',shopping:'<path d="M3 10h18l-2 11H5L3 10ZM8 10l4-7 4 7M9 14v3m6-3v3"/>',settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>',more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'};
 const navIcon=k=>`<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${NAV_ICONS[k]||NAV_ICONS.more}</svg>`;
@@ -398,7 +474,7 @@ function formField(name,label,value='',type='text',other=''){return `<div class=
 function selectField(name,label,value,opts){return `<div class="formfield"><label>${label}</label><select class="field" name="${name}">${opts.map(([v,l])=>`<option value="${escapeHtml(v)}" ${String(value)===String(v)?'selected':''}>${escapeHtml(l)}</option>`).join('')}</select></div>`}
 function formModal(){if(!modal)return '';let [kind,forced]=modal.split(':'),record=editId?byId(kind,editId):{},r=record||{};let fields='';if(kind==='people')fields=formField('name','Имя *',r.name,'text','required')+selectField('category','Категория',(r.category==='Друзья'?'Хорошие знакомые':r.category)||'Хорошие знакомые',['Семья','Близкий круг','Хорошие знакомые','Коллеги','Другие'].map(x=>[x,x]))+formField('group','Своя группа',r.group)+formField('birthday','День рождения',r.birthday,'date')+formField('tags','Метки для группировки',r.tags)+`<div class="hint">Например: близкий круг, семья, коллеги, обмен подарками.</div>`+`<div class="formfield"><label>Интересы и что любит</label><textarea class="field" name="interests" placeholder="Книги, путешествия, чёрный и красный цвет…">${escapeHtml([r.interests,r.likes].filter(Boolean).join(', '))}</textarea></div>`+formField('dislikes','Чего избегать / не дарить',r.dislikes)+formField('sizes','Размеры и полезные параметры',r.sizes)+formField('wishlist','Ссылка на вишлист',r.wishlist,'url')+`<div class="formfield"><label>Дополнительная информация</label><textarea class="field" name="extraDetails" placeholder="Любые полезные сведения, которые не вошли в поля выше">${escapeHtml(r.extraDetails||r.customFields||'')}</textarea></div>`;
 if(kind==='personNotes')fields=formField('date','Дата заметки',r.date||new Date().toISOString().slice(0,10),'date')+`<div class="formfield"><label>Что хочется запомнить *</label><textarea class="field" name="text" required>${escapeHtml(r.text||'')}</textarea></div>`;
-if(kind==='events')fields=formField('name','Название события *',r.name,'text','required')+formField('date','Дата *',r.date||new Date().toISOString().slice(0,10),'date','required')+selectField('type','Тип',r.type||'general',[['general','Общий праздник'],['birthday','День рождения'],['anniversary','Годовщина'],['personal','Личная дата'],['custom','Своё событие']])+selectField('personId','Человек (необязательно)',r.personId||window.eventPersonId||'',[['','Без привязки'],...db.people.map(p=>[p.id,p.name])])+selectField('repeat','Повторение',r.repeat||'yearly',[['yearly','Ежегодно'],['once','Разовое'],['custom','Произвольное']])+formField('repeatDays','Интервал повторения в днях (для произвольного)',r.repeatDays||'','number','min="1"')+`<div class="hint">Для произвольного повтора можно указать интервал в днях. Наследование получателей будет отдельным этапом.</div>`;
+if(kind==='events')fields=formField('name','Название события *',r.name,'text','required')+formField('date','Дата *',r.date||new Date().toISOString().slice(0,10),'date','required')+selectField('type','Тип',r.type||'general',[['general','Общий праздник'],['birthday','День рождения'],['anniversary','Годовщина'],['personal','Личная дата'],['custom','Своё событие']])+selectField('personId',r.type==='anniversary'?'Первый участник годовщины':'Человек (необязательно)',r.personId||window.eventPersonId||'',[['','Без привязки'],...db.people.map(p=>[p.id,p.name])])+`<div class="gp-anniversary-second" ${r.type==='anniversary'?'':'hidden'}>`+selectField('anniversarySecondPersonId','Второй участник годовщины (необязательно)',(Array.isArray(r.recipientIds)?r.recipientIds:[]).find(pid=>pid!==r.personId)||'',[['','Не выбран'],...db.people.map(p=>[p.id,p.name])])+`<p class="hint">Например, для годовщины свадьбы родителей выбери маму и папу. У других индивидуальных событий получатель остаётся один.</p></div>`+selectField('repeat','Повторение',r.repeat||'yearly',[['yearly','Ежегодно'],['once','Разовое'],['custom','Произвольное']])+formField('repeatDays','Интервал повторения в днях (для произвольного)',r.repeatDays||'','number','min="1"')+`<div class="hint">Для произвольного повтора можно указать интервал в днях. Наследование получателей будет отдельным этапом.</div>`;
 if(kind==='gifts')fields=formField('name','Название подарка *',r.name,'text','required')+selectField('type','Тип',r.type||forced||'buy',[['buy','Покупной'],['handmade','Handmade'],['bundle','Сборный подарок'],['experience','Впечатление']])+selectField('personId','Получатель',r.personId||window.giftPersonId||'',[['','Пока без получателя'],...db.people.map(p=>[p.id,p.name])])+selectField('eventId','Событие',r.eventId||window.pendingOccasion?.eventId||'',[['','Пока без события'],...db.events.map(e=>[e.id,e.name])])+formField('eventYear','Год вручения / планирования',r.eventYear||window.pendingOccasion?.year||new Date().getFullYear(),'number','min="1900" max="2200"')+selectField('status','Статус',r.status||(window.pendingOccasion?'planned':'idea'),[['idea','Идея'],['planned','Запланирован'],['making','В подготовке'],['ready','Готов'],['given','Вручён']])+formField('budget','Планируемый бюджет, ₽',r.budget||'','number','min="0"')+formField('actualCost','Фактически потрачено, ₽ (без покупок из списка)',r.actualCost||'','number','min="0"')+`<div class="formfield"><label>Заметка</label><textarea class="field" name="notes">${escapeHtml(r.notes)}</textarea></div>${r.id&&r.type==='bundle'?`<button type="button" class="btn secondary" data-bundle="${r.id}">Открыть состав набора</button>`:''}`;
 if(kind==='bundleItems')fields=formField('name','Название элемента *',r.name,'text','required')+selectField('type','Тип',r.type||'buy',[['buy','Покупка'],['handmade','Handmade'],['experience','Впечатление'],['packaging','Упаковка'],['other','Другое']])+selectField('status','Состояние',r.status||'planned',[['planned','Запланирован'],['ordered','Заказан / в работе'],['ready','Готов']])+formField('cost','Стоимость, ₽',r.cost||'','number','min="0"')+`<div class="formfield"><label>Заметка или ссылка</label><textarea class="field" name="notes">${escapeHtml(r.notes)}</textarea></div>`;
 if(kind==='shopping')fields=formField('name','Что купить *',r.name,'text','required')+formField('quantity','Количество',r.quantity)+formField('cost','Стоимость, ₽',r.cost,'number','min="0"')+selectField('giftId','Связанный подарок',r.giftId||'',[['','Без привязки'],...db.gifts.map(g=>[g.id,g.name])]);
@@ -421,7 +497,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-person],[d
 
 document.addEventListener('submit',e=>{if(e.target.id==='holiday-form'){e.preventDefault();applyHolidayCatalog(e.target)}});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-nav],[data-new],[data-edit],[data-close],[data-month],[data-view],[data-addmenu],[data-export],[data-delete],[data-work],[data-bundle],[data-default-events],[data-back]');if(!b)return;let d=b.dataset;if(b.hasAttribute('data-back')){movePage(previousPage===page?'home':previousPage);return}if(d.nav)movePage(d.nav);if(d.new){if(!['steps','bundleItems'].includes(d.new))selectedGift=null;openModal(d.new)}if(d.edit){let [kind,record]=d.edit.split(':');openModal(kind,record)}if(d.close){modal=null;editId=null;selectedGift=null;draw()}if(d.month){calMonth+=Number(d.month);if(calMonth>11){calMonth=0;calYear++}if(calMonth<0){calMonth=11;calYear--}draw()}if(d.view){let [k,v]=d.view.split(':');db.views[k]=v;draw()}if(b.hasAttribute('data-addmenu')){let x=prompt('Что добавить?\n1 — человека\n2 — событие\n3 — подарок\n4 — покупку\n5 — материал');let k={1:'people',2:'events',3:'gifts',4:'shopping',5:'materials'}[x];if(k)openModal(k)}if(d.work){selectedGift=d.work;draw()}if(d.bundle){selectedGift=d.bundle;modal=null;draw()}if(b.hasAttribute('data-default-events')){holidayChooser=true;draw()}if(b.hasAttribute('data-export')){let a=document.createElement('a'),blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});a.href=URL.createObjectURL(blob);a.download='gift-planner-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}if(d.delete){let [kind,record]=d.delete.split(':');if(confirm('Удалить запись? Это действие нельзя отменить.')){db[kind]=db[kind].filter(x=>x.id!==record);modal=null;editId=null;draw()}}});
-document.addEventListener('submit',e=>{if(e.target.id!=='record-form')return;e.preventDefault();let kind=e.target.dataset.kind,values=Object.fromEntries(new FormData(e.target)),record=editId?byId(kind,editId):{id:id()};if(!record)return;Object.assign(record,values);if(kind==='gifts'){
+document.addEventListener('submit',e=>{if(e.target.id!=='record-form')return;e.preventDefault();let kind=e.target.dataset.kind,values=Object.fromEntries(new FormData(e.target)),record=editId?byId(kind,editId):{id:id()};if(!record)return;if(kind==='events'&&values.type==='anniversary'){const primary=String(values.personId||window.eventPersonId||'');const second=String(values.anniversarySecondPersonId||'');if(primary&&second&&primary===second){alert('Выбери двух разных участников годовщины.');return;}}Object.assign(record,values);if(kind==='gifts'){
   // A gift attached to an event is a *planned gift*, never a free idea.
   // This also covers the path Person -> New gift -> Choose event.
   const linked=byId('events',values.eventId||window.pendingOccasion?.eventId);
@@ -433,7 +509,7 @@ document.addEventListener('submit',e=>{if(e.target.id!=='record-form')return;e.p
   }
   if(window.giftPersonId) values.personId=window.giftPersonId;
   record.recipientIds=[...new Set([values.personId,...new FormData(e.target).getAll('extraRecipients')].filter(Boolean))];
-}if(kind==='people'){record.likes='';}if(kind==='shopping')record.done=record.done||false;if(kind==='steps'){record.giftId=selectedGift;record.done=record.done||false}if(kind==='bundleItems'){if(!selectedGift){alert('Сначала открой нужный набор.');return}record.giftId=selectedGift;}if(kind==='personNotes')record.personId=window.notePersonId;if(kind==='events'&&window.eventPersonId){record.personId=window.eventPersonId;window.eventPersonId=null}if(kind==='gifts'&&window.giftPersonId){record.personId=window.giftPersonId;window.giftPersonId=null}if(!editId)db[kind].push(record);if(kind==='people'&&window.syncPersonBirthday)window.syncPersonBirthday(record);if(kind==='gifts')window.pendingOccasion=null;if(kind==='personNotes'){personDetailId=record.personId;personTab='profile'}if(kind==='gifts'&&record.type==='bundle'){selectedGift=record.id}else if(kind==='bundleItems'){selectedGift=record.giftId}modal=null;editId=null;draw()});
+}if(kind==='people'){record.likes='';}if(kind==='shopping')record.done=record.done||false;if(kind==='steps'){record.giftId=selectedGift;record.done=record.done||false}if(kind==='bundleItems'){if(!selectedGift){alert('Сначала открой нужный набор.');return}record.giftId=selectedGift;}if(kind==='personNotes')record.personId=window.notePersonId;if(kind==='events'&&window.eventPersonId){record.personId=window.eventPersonId;window.eventPersonId=null}if(kind==='events'){if(record.type==='anniversary'){const first=String(record.personId||''),second=String(values.anniversarySecondPersonId||'');const participants=[...new Set([first,second].filter(Boolean))].slice(0,2);record.personId=participants[0]||'';record.recipientIds=participants;for(const plan of db.occasionPlans.filter(p=>p.eventId===record.id)){plan.recipientIds=[...participants];}}else{record.recipientIds=record.personId?[record.personId]:[];}}if(kind==='gifts'&&window.giftPersonId){record.personId=window.giftPersonId;window.giftPersonId=null}if(!editId)db[kind].push(record);if(kind==='people'&&window.syncPersonBirthday)window.syncPersonBirthday(record);if(kind==='gifts')window.pendingOccasion=null;if(kind==='personNotes'){personDetailId=record.personId;personTab='profile'}if(kind==='gifts'&&record.type==='bundle'){selectedGift=record.id}else if(kind==='bundleItems'){selectedGift=record.giftId}modal=null;editId=null;draw()});
 document.addEventListener('change',e=>{
  const el=e.target;
  if(!el.matches('#record-form[data-kind="gifts"] select[name="eventId"]'))return;
@@ -658,7 +734,7 @@ document.addEventListener('click',e=>{
  if(b.hasAttribute('data-plancreate')){
    const e=byId('events',editId),y=Number(window.occasionYear)||new Date().getFullYear();if(!e)return;
    const previous=db.occasionPlans.filter(x=>x.eventId===e.id&&x.year<y).sort((a,b)=>b.year-a.year)[0];
-   db.occasionPlans.push({id:id(),eventId:e.id,year:y,recipientIds:previous?[...previous.recipientIds]:[],budget:'',startDate:'',deliveryDate:dateAtYear(e,y)||'',prepLeadDays:30,makingDays:14,shippingDays:7,bufferDays:2,done:false});occasionEditMode=true;planSavedFeedback=false;draw();return;
+   db.occasionPlans.push({id:id(),eventId:e.id,year:y,recipientIds:e.type==='anniversary'?[...new Set([e.personId,...(Array.isArray(e.recipientIds)?e.recipientIds:[])].filter(Boolean))].slice(0,2):(previous?[...previous.recipientIds]:[]),budget:'',startDate:'',deliveryDate:dateAtYear(e,y)||'',prepLeadDays:30,makingDays:14,shippingDays:7,bufferDays:2,done:false});occasionEditMode=true;planSavedFeedback=false;draw();return;
  }
  if(b.hasAttribute('data-planedit')){const eid=editId;openModal('events',eid);return}
  if(b.hasAttribute('data-plannewgift')){window.pendingOccasion={eventId:editId,year:Number(window.occasionYear)||new Date().getFullYear()};modal='gifts';editId=null;draw();return}
@@ -682,7 +758,7 @@ document.addEventListener('submit',e=>{
    e.preventDefault();e.stopImmediatePropagation();
    const rec=occasionPlan(editId,window.occasionYear);if(!rec)return;
    const fd=new FormData(e.target);rec.budget=fd.get('budget')||'';rec.deliveryDate=fd.get('deliveryDate')||'';rec.startDate=fd.get('startDate')||'';
-   rec.recipientIds=fd.getAll('recipient').map(String);rec.done=fd.has('done');rec.mode=fd.get('mode')||'full';
+   rec.recipientIds=fd.getAll('recipient').map(String);const editedEvent=byId('events',rec.eventId);if(editedEvent?.type==='anniversary'){rec.recipientIds=[...new Set([editedEvent.personId,...(Array.isArray(editedEvent.recipientIds)?editedEvent.recipientIds:[])].filter(Boolean))].slice(0,2);}rec.done=fd.has('done');rec.mode=fd.get('mode')||'full';
    for(const key of ['prepLeadDays','makingDays','shippingDays','bufferDays'])rec[key]=numberSetting(fd.get(key),{prepLeadDays:30,makingDays:14,shippingDays:7,bufferDays:2}[key]);
    occasionEditMode=false;planSavedFeedback=true;syncPlanTasks(rec,byId('events',rec.eventId));draw();return;
  }
@@ -908,7 +984,7 @@ occasionHtml=function(){
  const event=byId('events',editId);if(!event)return '';
  const y=Number(window.occasionYear)||new Date().getFullYear(),plan=occasionPlan(event.id,y),eventDate=dateAtYear(event,y);
  const related=db.gifts.filter(g=>g.eventId===event.id&&Number(g.eventYear||y)===y&&g.status!=='idea');
- const people=[...new Set([...(plan?.recipientIds||[]),...related.flatMap(g=>[g.personId,...(Array.isArray(g.recipientIds)?g.recipientIds:[])].filter(Boolean))])];
+ const people=[...new Set([...(plan?.recipientIds||[]),...(event.type==='anniversary'?(Array.isArray(event.recipientIds)?event.recipientIds:[event.personId]):[]),...related.flatMap(g=>[g.personId,...(Array.isArray(g.recipientIds)?g.recipientIds:[])].filter(Boolean))].filter(Boolean))];
  const expenses=related.reduce((sum,g)=>sum+budgetFor(g).amount,0);
  const full=plan?.mode!=='simple',skipped=(event.skipPlanningYears||[]).some(n=>Number(n)===y);
  const relatedFor=pid=>related.filter(g=>g.personId===pid||(Array.isArray(g.recipientIds)?g.recipientIds:[]).includes(pid));
@@ -947,7 +1023,7 @@ if(!NAV.some(n=>n[0]==='plans'))NAV.splice(NAV.length-1,0,['plans','▤','Пла
 let confirmPlanRemovalV10=false, giftViewedFromV10=null;
 const eventYearV10=(g)=>Number(g.eventYear||new Date().getFullYear());
 function associatedPeopleV10(e,year){
- const p=new Set();if(e.personId)p.add(e.personId);
+ const p=new Set();if(e.personId)p.add(e.personId);if(e.type==='anniversary')for(const pid of (Array.isArray(e.recipientIds)?e.recipientIds:[]))if(pid)p.add(pid);
  for(const plan of db.occasionPlans.filter(x=>x.eventId===e.id&&(year===undefined||Number(x.year)===Number(year))))for(const id of (plan.recipientIds||[]))p.add(id);
  for(const g of db.gifts.filter(x=>x.eventId===e.id&&(year===undefined||eventYearV10(x)===Number(year)))){
   if(g.personId)p.add(g.personId);for(const pid of (Array.isArray(g.recipientIds)?g.recipientIds:[]))p.add(pid);
@@ -1084,7 +1160,7 @@ document.addEventListener('click',ev=>{
   const e=byId('events',editId),y=Number(window.occasionYear)||new Date().getFullYear();if(!e)return;
   const existing=occasionPlan(e.id,y);if(existing){occasionEditMode=true;draw();return}
   const prev=db.occasionPlans.filter(x=>x.eventId===e.id&&Number(x.year)<y).sort((a,b)=>Number(b.year)-Number(a.year))[0];
-  const chosen=prev?.recipientIds?.length?[...prev.recipientIds]:(e.personId?[e.personId]:[]);
+  const chosen=e.type==='anniversary'?[...new Set([e.personId,...(Array.isArray(e.recipientIds)?e.recipientIds:[])].filter(Boolean))].slice(0,2):(prev?.recipientIds?.length?[...prev.recipientIds]:(e.personId?[e.personId]:[]));
   const mode=planningModeForV10(e,chosen);
   db.occasionPlans.push({id:id(),eventId:e.id,year:y,recipientIds:chosen,budget:'',startDate:'',deliveryDate:dateAtYear(e,y)||'',prepLeadDays:mode==='full'?60:14,makingDays:14,shippingDays:7,bufferDays:2,mode,done:false});
   e.skipPlanningYears=(e.skipPlanningYears||[]).filter(v=>Number(v)!==y);occasionEditMode=true;confirmPlanRemovalV10=false;draw();return;
@@ -1397,7 +1473,7 @@ occasionHtml=function(){
  return html;
 };
 const v12oldSummary=eventSummaryV10;
-eventSummaryV10=function(e){let html=v12oldSummary(e);if(v12individual(e))html=html.replace(/\s*[·•]\s*\d+\s+участников/g,'');return html};
+eventSummaryV10=function(e){let html=v12oldSummary(e);if(v12individual(e)&&e.type!=='anniversary')html=html.replace(/\s*[·•]\s*\d+\s+участников/g,'');return html};
 // No group-on-top-of-category duplication. Legacy group/tags are kept safely in the JSON.
 const v12oldForm=formModal;
 formModal=function(){
@@ -1599,7 +1675,7 @@ document.addEventListener('click',ev=>{
  v13SetMode(e,y,mode);
  if(mode==='simple'||mode==='full'){
   const prev=db.occasionPlans.filter(x=>x.eventId===e.id&&Number(x.year)<y).sort((a,b)=>Number(b.year)-Number(a.year))[0];
-  const recs=v13Individual(e)?[e.personId||e.autoBirthdayPersonId||''].filter(Boolean):[...(prev?.recipientIds||[])];
+  const recs=e.type==='anniversary'?[...new Set([e.personId,...(Array.isArray(e.recipientIds)?e.recipientIds:[])].filter(Boolean))].slice(0,2):(v13Individual(e)?[e.personId||e.autoBirthdayPersonId||''].filter(Boolean):[...(prev?.recipientIds||[])]);
   db.occasionPlans.push({id:id(),eventId:e.id,year:y,recipientIds:recs,budget:'',startDate:'',deliveryDate:dateAtYear(e,y)||'',prepLeadDays:mode==='full'?60:14,makingDays:14,shippingDays:7,bufferDays:2,mode,done:false});
   occasionEditMode=true;
  }
@@ -2398,4 +2474,16 @@ body:not(.dark){--v16-solid-lavender:#f5f0fb;--v16-soft-sage:#eef7f2;--v16-soft-
 </style>
 
 
-<script>if('serviceWorker' in navigator && location.protocol==='https:'){window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(console.warn));}</script><script type="module" src="./firebase-sync.js"></script></body></html>
+<script>if('serviceWorker' in navigator && location.protocol==='https:'){window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(console.warn));}</script>
+<script id="gp-anniversary-fields">
+document.addEventListener('change', function(e) {
+  const typeField = e.target;
+  if (!typeField.matches('#record-form[data-kind="events"] select[name="type"]')) return;
+  const form = typeField.closest('form');
+  const extra = form?.querySelector('.gp-anniversary-second');
+  if (extra) extra.hidden = typeField.value !== 'anniversary';
+  const firstLabel = form?.querySelector('select[name="personId"]')?.closest('.formfield')?.querySelector('label');
+  if (firstLabel) firstLabel.textContent = typeField.value === 'anniversary' ? 'Первый участник годовщины' : 'Человек (необязательно)';
+}, true);
+</script>
+<script type="module" src="./firebase-sync.js"></script></body></html>

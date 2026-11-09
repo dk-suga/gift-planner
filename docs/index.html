@@ -474,7 +474,7 @@ function formField(name,label,value='',type='text',other=''){return `<div class=
 function selectField(name,label,value,opts){return `<div class="formfield"><label>${label}</label><select class="field" name="${name}">${opts.map(([v,l])=>`<option value="${escapeHtml(v)}" ${String(value)===String(v)?'selected':''}>${escapeHtml(l)}</option>`).join('')}</select></div>`}
 function formModal(){if(!modal)return '';let [kind,forced]=modal.split(':'),record=editId?byId(kind,editId):{},r=record||{};let fields='';if(kind==='people')fields=formField('name','Имя *',r.name,'text','required')+selectField('category','Категория',(r.category==='Друзья'?'Хорошие знакомые':r.category)||'Хорошие знакомые',['Семья','Близкий круг','Хорошие знакомые','Коллеги','Другие'].map(x=>[x,x]))+formField('group','Своя группа',r.group)+formField('birthday','День рождения',r.birthday,'date')+formField('tags','Метки для группировки',r.tags)+`<div class="hint">Например: близкий круг, семья, коллеги, обмен подарками.</div>`+`<div class="formfield"><label>Интересы и что любит</label><textarea class="field" name="interests" placeholder="Книги, путешествия, чёрный и красный цвет…">${escapeHtml([r.interests,r.likes].filter(Boolean).join(', '))}</textarea></div>`+formField('dislikes','Чего избегать / не дарить',r.dislikes)+formField('sizes','Размеры и полезные параметры',r.sizes)+formField('wishlist','Ссылка на вишлист',r.wishlist,'url')+`<div class="formfield"><label>Дополнительная информация</label><textarea class="field" name="extraDetails" placeholder="Любые полезные сведения, которые не вошли в поля выше">${escapeHtml(r.extraDetails||r.customFields||'')}</textarea></div>`;
 if(kind==='personNotes')fields=formField('date','Дата заметки',r.date||new Date().toISOString().slice(0,10),'date')+`<div class="formfield"><label>Что хочется запомнить *</label><textarea class="field" name="text" required>${escapeHtml(r.text||'')}</textarea></div>`;
-if(kind==='events')fields=formField('name','Название события *',r.name,'text','required')+formField('date','Дата *',r.date||new Date().toISOString().slice(0,10),'date','required')+selectField('type','Тип',r.type||'general',[['general','Общий праздник'],['birthday','День рождения'],['anniversary','Годовщина'],['personal','Личная дата'],['custom','Своё событие']])+selectField('personId',r.type==='anniversary'?'Первый участник годовщины':'Человек (необязательно)',r.personId||window.eventPersonId||'',[['','Без привязки'],...db.people.map(p=>[p.id,p.name])])+`<div class="gp-anniversary-second" ${r.type==='anniversary'?'':'hidden'}>`+selectField('anniversarySecondPersonId','Второй участник годовщины (необязательно)',(Array.isArray(r.recipientIds)?r.recipientIds:[]).find(pid=>pid!==r.personId)||'',[['','Не выбран'],...db.people.map(p=>[p.id,p.name])])+`<p class="hint">Например, для годовщины свадьбы родителей выбери маму и папу. У других индивидуальных событий получатель остаётся один.</p></div>`+selectField('repeat','Повторение',r.repeat||'yearly',[['yearly','Ежегодно'],['once','Разовое'],['custom','Произвольное']])+formField('repeatDays','Интервал повторения в днях (для произвольного)',r.repeatDays||'','number','min="1"')+`<div class="hint">Для произвольного повтора можно указать интервал в днях. Наследование получателей будет отдельным этапом.</div>`;
+if(kind==='events')fields=formField('name','Название события *',r.name,'text','required')+formField('date','Дата *',r.date||new Date().toISOString().slice(0,10),'date','required')+selectField('type','Тип',r.type||'general',[['general','Общий праздник'],['birthday','День рождения'],['anniversary','Годовщина'],['personal','Личная дата'],['custom','Своё событие']])+selectField('personId',r.type==='anniversary'?'Первый участник годовщины':'Человек (необязательно)',r.personId||window.eventPersonId||'',[['','Без привязки'],...db.people.map(p=>[p.id,p.name])])+`<div class="gp-anniversary-second" ${r.type==='anniversary'?'':'hidden'}>`+selectField('anniversarySecondPersonId','Второй участник годовщины (необязательно)',((Array.isArray(r.recipientIds)?r.recipientIds:(typeof r.recipientIds==='string'?r.recipientIds.split(','):[])).find(pid=>pid&&pid!==r.personId)||r.anniversarySecondPersonId||''),[['','Не выбран'],...db.people.map(p=>[p.id,p.name])])+`<p class="hint">Например, для годовщины свадьбы родителей выбери маму и папу. У других индивидуальных событий получатель остаётся один.</p></div>`+selectField('repeat','Повторение',r.repeat||'yearly',[['yearly','Ежегодно'],['once','Разовое'],['custom','Произвольное']])+formField('repeatDays','Интервал повторения в днях (для произвольного)',r.repeatDays||'','number','min="1"')+`<div class="hint">Для произвольного повтора можно указать интервал в днях. Наследование получателей будет отдельным этапом.</div>`;
 if(kind==='gifts')fields=formField('name','Название подарка *',r.name,'text','required')+selectField('type','Тип',r.type||forced||'buy',[['buy','Покупной'],['handmade','Handmade'],['bundle','Сборный подарок'],['experience','Впечатление']])+selectField('personId','Получатель',r.personId||window.giftPersonId||'',[['','Пока без получателя'],...db.people.map(p=>[p.id,p.name])])+selectField('eventId','Событие',r.eventId||window.pendingOccasion?.eventId||'',[['','Пока без события'],...db.events.map(e=>[e.id,e.name])])+formField('eventYear','Год вручения / планирования',r.eventYear||window.pendingOccasion?.year||new Date().getFullYear(),'number','min="1900" max="2200"')+selectField('status','Статус',r.status||(window.pendingOccasion?'planned':'idea'),[['idea','Идея'],['planned','Запланирован'],['making','В подготовке'],['ready','Готов'],['given','Вручён']])+formField('budget','Планируемый бюджет, ₽',r.budget||'','number','min="0"')+formField('actualCost','Фактически потрачено, ₽ (без покупок из списка)',r.actualCost||'','number','min="0"')+`<div class="formfield"><label>Заметка</label><textarea class="field" name="notes">${escapeHtml(r.notes)}</textarea></div>${r.id&&r.type==='bundle'?`<button type="button" class="btn secondary" data-bundle="${r.id}">Открыть состав набора</button>`:''}`;
 if(kind==='bundleItems')fields=formField('name','Название элемента *',r.name,'text','required')+selectField('type','Тип',r.type||'buy',[['buy','Покупка'],['handmade','Handmade'],['experience','Впечатление'],['packaging','Упаковка'],['other','Другое']])+selectField('status','Состояние',r.status||'planned',[['planned','Запланирован'],['ordered','Заказан / в работе'],['ready','Готов']])+formField('cost','Стоимость, ₽',r.cost||'','number','min="0"')+`<div class="formfield"><label>Заметка или ссылка</label><textarea class="field" name="notes">${escapeHtml(r.notes)}</textarea></div>`;
 if(kind==='shopping')fields=formField('name','Что купить *',r.name,'text','required')+formField('quantity','Количество',r.quantity)+formField('cost','Стоимость, ₽',r.cost,'number','min="0"')+selectField('giftId','Связанный подарок',r.giftId||'',[['','Без привязки'],...db.gifts.map(g=>[g.id,g.name])]);
@@ -509,7 +509,26 @@ document.addEventListener('submit',e=>{if(e.target.id!=='record-form')return;e.p
   }
   if(window.giftPersonId) values.personId=window.giftPersonId;
   record.recipientIds=[...new Set([values.personId,...new FormData(e.target).getAll('extraRecipients')].filter(Boolean))];
-}if(kind==='people'){record.likes='';}if(kind==='shopping')record.done=record.done||false;if(kind==='steps'){record.giftId=selectedGift;record.done=record.done||false}if(kind==='bundleItems'){if(!selectedGift){alert('Сначала открой нужный набор.');return}record.giftId=selectedGift;}if(kind==='personNotes')record.personId=window.notePersonId;if(kind==='events'&&window.eventPersonId){record.personId=window.eventPersonId;window.eventPersonId=null}if(kind==='events'){if(record.type==='anniversary'){const first=String(record.personId||''),second=String(values.anniversarySecondPersonId||'');const participants=[...new Set([first,second].filter(Boolean))].slice(0,2);record.personId=participants[0]||'';record.recipientIds=participants;for(const plan of db.occasionPlans.filter(p=>p.eventId===record.id)){plan.recipientIds=[...participants];}}else{record.recipientIds=record.personId?[record.personId]:[];}}if(kind==='gifts'&&window.giftPersonId){record.personId=window.giftPersonId;window.giftPersonId=null}if(kind==='gifts')Object.assign(record,values);if(!editId)db[kind].push(record);if(kind==='people'&&window.syncPersonBirthday)window.syncPersonBirthday(record);if(kind==='gifts')window.pendingOccasion=null;if(kind==='personNotes'){personDetailId=record.personId;personTab='profile'}if(kind==='gifts'&&record.type==='bundle'){selectedGift=record.id}else if(kind==='bundleItems'){selectedGift=record.giftId}modal=null;editId=null;draw()});
+}if(kind==='people'){record.likes='';}if(kind==='shopping')record.done=record.done||false;if(kind==='steps'){record.giftId=selectedGift;record.done=record.done||false}if(kind==='bundleItems'){if(!selectedGift){alert('Сначала открой нужный набор.');return}record.giftId=selectedGift;}if(kind==='personNotes')record.personId=window.notePersonId;if(kind==='events'){
+ // The form selection wins. The originating person is only a fallback for an unselected first person.
+ if(!record.personId&&window.eventPersonId)record.personId=window.eventPersonId;
+ window.eventPersonId=null;
+ if(record.type==='anniversary'){
+  const primary=String(record.personId||'').trim();
+  const second=String(values.anniversarySecondPersonId||'').trim();
+  const participants=[...new Set([primary,second].filter(Boolean))].slice(0,2);
+  record.personId=participants[0]||'';
+  record.anniversarySecondPersonId=participants.find(pid=>pid!==record.personId)||'';
+  record.recipientIds=participants;
+  // Keep the anniversary and all of its existing year plans consistent.
+  for(const plan of db.occasionPlans.filter(p=>p.eventId===record.id)){
+   plan.recipientIds=[...participants];
+  }
+ }else{
+  record.anniversarySecondPersonId='';
+  record.recipientIds=record.personId?[record.personId]:[];
+ }
+}if(kind==='gifts'&&window.giftPersonId){record.personId=window.giftPersonId;window.giftPersonId=null}if(kind==='gifts')Object.assign(record,values);if(!editId)db[kind].push(record);if(kind==='people'&&window.syncPersonBirthday)window.syncPersonBirthday(record);if(kind==='gifts')window.pendingOccasion=null;if(kind==='personNotes'){personDetailId=record.personId;personTab='profile'}if(kind==='gifts'&&record.type==='bundle'){selectedGift=record.id}else if(kind==='bundleItems'){selectedGift=record.giftId}modal=null;editId=null;draw()});
 document.addEventListener('change',e=>{
  const el=e.target;
  if(!el.matches('#record-form[data-kind="gifts"] select[name="eventId"]'))return;
@@ -2072,7 +2091,16 @@ occasionHtml=function(){
 
   const gifts = v16GiftsForOccasion(event, year);
   const ideas = v16IdeasForOccasion(event, year);
-  const personIds = [...new Set(gifts.flatMap(g=>[g.personId,...(Array.isArray(g.recipientIds)?g.recipientIds:[])].filter(Boolean)))];
+  const planForThisYear=db.occasionPlans.find(p=>p.eventId===event.id && Number(p.year)===Number(year));
+  const anniversaryIds=event.type==='anniversary'
+   ? [event.personId,...(Array.isArray(event.recipientIds)?event.recipientIds:(typeof event.recipientIds==='string'?event.recipientIds.split(','):[])),event.anniversarySecondPersonId]
+   : [event.personId];
+  // The event's recipients belong in the plan even when there are no gifts yet.
+  const personIds=[...new Set([
+   ...anniversaryIds,
+   ...(Array.isArray(planForThisYear?.recipientIds)?planForThisYear.recipientIds:[]),
+   ...gifts.flatMap(g=>[g.personId,...(Array.isArray(g.recipientIds)?g.recipientIds:[])])
+  ].filter(Boolean))].filter(pid=>!!byId('people',pid));
   const giftLine = g=>`<div class="event-gift-row"><div class="item-main"><button class="gift-title-link" type="button" data-gift-view-v10="${g.id}">${escapeHtml(g.name)} ↗</button><span class="muted small">${escapeHtml(statusName(g.status))} · ${fmt(budgetFor(g).amount)}</span></div><button class="subtle-btn" type="button" data-plan-gift-edit="${g.id}" aria-label="Изменить подарок">✎</button></div>`;
   const unassigned = gifts.filter(g=>!g.personId && !(Array.isArray(g.recipientIds)&&g.recipientIds.length));
   const panelHtml = `<section class="event-gifts-panel"><div class="row between compact-heading"><div><h3>Подарки этого праздника</h3><p class="muted small">${gifts.length} подарков${personIds.length?` · ${personIds.length} получателей`:''}</p></div><button class="btn secondary" type="button" data-v13-addgift>+ Подарок</button></div>${personIds.map(pid=>`<div class="event-recipient"><div class="row between"><strong>${escapeHtml(byId('people',pid)?.name||'Получатель')}</strong><button class="linklike" type="button" data-plan-person-gift="${pid}">+ Для него</button></div>${gifts.filter(g=>g.personId===pid||(Array.isArray(g.recipientIds)&&g.recipientIds.includes(pid))).map(giftLine).join('')}</div>`).join('')}${unassigned.length?`<div class="event-recipient"><strong>Без получателя</strong>${unassigned.map(giftLine).join('')}</div>`:''}${!gifts.length?'<p class="muted small">Для этого года подарки пока не назначены.</p>':''}${ideas.length?`<div class="v15-occasion-ideas"><h4>Идеи для этого праздника</h4>${ideas.map(g=>`<button type="button" class="linklike" data-gift-view-v10="${g.id}">${escapeHtml(g.name)} ↗</button>`).join('')}</div>`:''}</section>`;
@@ -2088,6 +2116,18 @@ occasionHtml=function(){
   }
 
   const modal = tpl.content.querySelector('.occasion-modal');
+  if(event.type==='anniversary'){
+    const header=modal?.querySelector('.eyebrow')?.parentElement;
+    if(header){
+      const box=document.createElement('div');
+      box.className='gp-anniversary-saved-members';
+      const ids=[...new Set([event.personId,...(Array.isArray(event.recipientIds)?event.recipientIds:[]),event.anniversarySecondPersonId].filter(Boolean))];
+      box.innerHTML=ids.length
+       ? `<span class="gp-anniversary-members-label">Участники годовщины:</span> ${ids.map(pid=>`<span class="gp-anniversary-member">${escapeHtml(byId('people',pid)?.name||'Участник')}</span>`).join('')}`
+       : `<span class="muted small">Участники пока не указаны. Их можно выбрать в настройках события.</span>`;
+      header.appendChild(box);
+    }
+  }
   const finalActions = modal ? [...modal.children].reverse().find(node=>node.classList?.contains('modal-actions')) : null;
   const head = modal?.querySelector('.v11-occasion-head');
   if(modal && (finalActions || head)){
@@ -2522,6 +2562,31 @@ document.addEventListener('click',event=>{
 },true);
 
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&gpIdeaDraft){gpIdeaDraft=false;gpIdeaReturnPerson='';window.giftPersonId=null;}},true);
+
+// Show every saved anniversary participant in the event's recipient cards,
+// including the first year before a detailed or simple plan is created.
+const gpOccasionAnniversaryBase = occasionHtml;
+occasionHtml=function(){
+ const html=gpOccasionAnniversaryBase();
+ const event=byId('events',editId);
+ if(!event||event.type!=='anniversary'||!html)return html;
+ const ids=[...new Set([event.personId,...(Array.isArray(event.recipientIds)?event.recipientIds:[]),event.anniversarySecondPersonId].filter(Boolean))].filter(pid=>!!byId('people',pid)).slice(0,2);
+ if(!ids.length)return html;
+ const t=document.createElement('template');t.innerHTML=html;
+ const panel=t.content.querySelector('.occasion-modal .event-gifts-panel');
+ if(panel){
+  const visible=new Set([...panel.querySelectorAll('[data-plan-person-gift]')].map(b=>b.dataset.planPersonGift));
+  for(const pid of ids){
+   if(visible.has(pid))continue;
+   const tile=document.createElement('div');tile.className='event-recipient';
+   tile.innerHTML=`<div class="row between"><strong>${escapeHtml(byId('people',pid).name)}</strong><button class="linklike" type="button" data-plan-person-gift="${pid}">+ Для него</button></div><p class="muted small">Подарок пока не выбран.</p>`;
+   panel.appendChild(tile);
+  }
+  const count=panel.querySelector('.compact-heading .muted');
+  if(count){const gifts=v16GiftsForOccasion(event,Number(window.occasionYear)||new Date().getFullYear());count.textContent=`${gifts.length} подарков · ${ids.length} участников годовщины`;}
+ }
+ return t.innerHTML;
+};
 // Consistent naming and no more than a single category badge in any profile header.
 draw();
 })();
@@ -2599,6 +2664,12 @@ document.addEventListener('change', function(e) {
 }, true);
 </script>
 
+
+<style id="gp-anniversary-save-style">
+.gp-anniversary-saved-members{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:10px;line-height:1.4}
+.gp-anniversary-members-label{font-size:13px;font-weight:700;color:var(--muted)}
+.gp-anniversary-member{display:inline-flex;align-items:center;padding:5px 11px;border:1px solid var(--line);background:var(--panel2);border-radius:999px;font-size:13px;font-weight:650;color:var(--text);max-width:100%;overflow-wrap:anywhere}
+</style>
 <style id="gp-idea-category-style">
 .gp-category-filter{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:-5px 0 18px;max-width:100%;}
 .gp-category-btn{display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--muted);font-weight:700;font-size:13px;line-height:1.2;white-space:nowrap;}

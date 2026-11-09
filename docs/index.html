@@ -509,7 +509,7 @@ document.addEventListener('submit',e=>{if(e.target.id!=='record-form')return;e.p
   }
   if(window.giftPersonId) values.personId=window.giftPersonId;
   record.recipientIds=[...new Set([values.personId,...new FormData(e.target).getAll('extraRecipients')].filter(Boolean))];
-}if(kind==='people'){record.likes='';}if(kind==='shopping')record.done=record.done||false;if(kind==='steps'){record.giftId=selectedGift;record.done=record.done||false}if(kind==='bundleItems'){if(!selectedGift){alert('Сначала открой нужный набор.');return}record.giftId=selectedGift;}if(kind==='personNotes')record.personId=window.notePersonId;if(kind==='events'&&window.eventPersonId){record.personId=window.eventPersonId;window.eventPersonId=null}if(kind==='events'){if(record.type==='anniversary'){const first=String(record.personId||''),second=String(values.anniversarySecondPersonId||'');const participants=[...new Set([first,second].filter(Boolean))].slice(0,2);record.personId=participants[0]||'';record.recipientIds=participants;for(const plan of db.occasionPlans.filter(p=>p.eventId===record.id)){plan.recipientIds=[...participants];}}else{record.recipientIds=record.personId?[record.personId]:[];}}if(kind==='gifts'&&window.giftPersonId){record.personId=window.giftPersonId;window.giftPersonId=null}if(!editId)db[kind].push(record);if(kind==='people'&&window.syncPersonBirthday)window.syncPersonBirthday(record);if(kind==='gifts')window.pendingOccasion=null;if(kind==='personNotes'){personDetailId=record.personId;personTab='profile'}if(kind==='gifts'&&record.type==='bundle'){selectedGift=record.id}else if(kind==='bundleItems'){selectedGift=record.giftId}modal=null;editId=null;draw()});
+}if(kind==='people'){record.likes='';}if(kind==='shopping')record.done=record.done||false;if(kind==='steps'){record.giftId=selectedGift;record.done=record.done||false}if(kind==='bundleItems'){if(!selectedGift){alert('Сначала открой нужный набор.');return}record.giftId=selectedGift;}if(kind==='personNotes')record.personId=window.notePersonId;if(kind==='events'&&window.eventPersonId){record.personId=window.eventPersonId;window.eventPersonId=null}if(kind==='events'){if(record.type==='anniversary'){const first=String(record.personId||''),second=String(values.anniversarySecondPersonId||'');const participants=[...new Set([first,second].filter(Boolean))].slice(0,2);record.personId=participants[0]||'';record.recipientIds=participants;for(const plan of db.occasionPlans.filter(p=>p.eventId===record.id)){plan.recipientIds=[...participants];}}else{record.recipientIds=record.personId?[record.personId]:[];}}if(kind==='gifts'&&window.giftPersonId){record.personId=window.giftPersonId;window.giftPersonId=null}if(kind==='gifts')Object.assign(record,values);if(!editId)db[kind].push(record);if(kind==='people'&&window.syncPersonBirthday)window.syncPersonBirthday(record);if(kind==='gifts')window.pendingOccasion=null;if(kind==='personNotes'){personDetailId=record.personId;personTab='profile'}if(kind==='gifts'&&record.type==='bundle'){selectedGift=record.id}else if(kind==='bundleItems'){selectedGift=record.giftId}modal=null;editId=null;draw()});
 document.addEventListener('change',e=>{
  const el=e.target;
  if(!el.matches('#record-form[data-kind="gifts"] select[name="eventId"]'))return;
@@ -2410,6 +2410,118 @@ settings=function(){
    :html+block;
 };
 
+
+// Person-linked free ideas and an explicit category filter, sharing existing gift records.
+let gpCategoryFilter='all';
+let gpIdeaDraft=false;
+let gpIdeaReturnPerson='';
+const gpCategoryName=p=>p.category==='Друзья'?'Хорошие знакомые':String(p.category||'Без категории').trim()||'Без категории';
+const gpUnfilteredPeople=people;
+people=function(){
+ const template=document.createElement('template');
+ template.innerHTML=gpUnfilteredPeople();
+ const categories=[...new Set(db.people.map(gpCategoryName))].sort((a,b)=>a.localeCompare(b,'ru'));
+ if(gpCategoryFilter!=='all'&&!categories.includes(gpCategoryFilter))gpCategoryFilter='all';
+ const matchingCards=[...template.content.querySelectorAll('.v14-person-card[data-person]')];
+ let shown=0;
+ for(const node of matchingCards){
+   const person=byId('people',node.dataset.person);
+   const show=gpCategoryFilter==='all'||(person&&gpCategoryName(person)===gpCategoryFilter);
+   node.style.display=show?'':'none';
+   if(show)shown++;
+ }
+ const toolbar=template.content.querySelector('.toolbar');
+ if(toolbar){
+   const bar=document.createElement('div');bar.className='gp-category-filter';
+   bar.setAttribute('role','group');bar.setAttribute('aria-label','Фильтр людей по категориям');
+   const visibleCounts=new Map();
+   matchingCards.forEach(node=>{const person=byId('people',node.dataset.person);if(person){const cat=gpCategoryName(person);visibleCounts.set(cat,(visibleCounts.get(cat)||0)+1)}});
+   const makeButton=(name,label,count)=>`<button type="button" class="gp-category-btn ${gpCategoryFilter===name?'active':''}" data-gp-category="${escapeHtml(name)}" aria-pressed="${gpCategoryFilter===name?'true':'false'}">${escapeHtml(label)}<span class="gp-category-count">${count}</span></button>`;
+   bar.innerHTML=makeButton('all','Все',matchingCards.length)+categories.map(category=>makeButton(category,category,visibleCounts.get(category)||0)).join('');
+   toolbar.after(bar);
+ }
+ const grid=template.content.querySelector('.v14-person-card')?.parentElement;
+ if(grid&&shown===0&&matchingCards.length){
+   const empty=document.createElement('div');empty.className='empty gp-filter-empty';
+   empty.textContent='В этой категории по текущему поиску никого нет.';
+   grid.after(empty);
+ }
+ return template.innerHTML;
+};
+const gpPreviousProfileIdeas=profileHtml;
+profileHtml=function(){
+ const html=gpPreviousProfileIdeas();
+ if(personTab!=='gifts'||!personDetailId)return html;
+ const template=document.createElement('template');template.innerHTML=html;
+ const title=[...template.content.querySelectorAll('h3')].find(el=>el.textContent.trim()==='Идеи на будущее');
+ if(title){
+   const group=title.closest('.compact-heading')||title.parentElement;
+   group.classList.add('gp-ideas-heading');
+   const button=document.createElement('button');button.type='button';button.className='btn secondary';
+   button.dataset.gpPersonNewIdea=personDetailId;button.textContent='+ Новая идея';
+   group.appendChild(button);
+ }
+ return template.innerHTML;
+};
+const gpPreviousGiftsIdeas=gifts;
+gifts=function(){
+ const template=document.createElement('template');template.innerHTML=gpPreviousGiftsIdeas();
+ const top=template.content.querySelector('.top');
+ const giftBtn=top?.querySelector('[data-new="gifts"]');
+ if(giftBtn){
+   const wrapper=document.createElement('div');wrapper.className='gp-add-actions';
+   const ideaBtn=document.createElement('button');ideaBtn.type='button';ideaBtn.className='btn secondary';
+   ideaBtn.dataset.gpNewIdea='';ideaBtn.textContent='+ Идея';
+   giftBtn.replaceWith(wrapper);wrapper.append(ideaBtn,giftBtn);
+ }
+ return template.innerHTML;
+};
+const gpPreviousIdeaForm=formModal;
+formModal=function(){
+ const html=gpPreviousIdeaForm();
+ if(!gpIdeaDraft||modal!=='gifts'||editId)return html;
+ const template=document.createElement('template');template.innerHTML=html;
+ const heading=template.content.querySelector('.modal h2');if(heading)heading.textContent='Новая идея подарка';
+ const form=template.content.querySelector('#record-form[data-kind="gifts"]');
+ if(form){
+   for(const field of ['eventId','eventYear'])form.querySelector(`[name="${field}"]`)?.closest('.formfield')?.remove();
+   const status=form.querySelector('[name="status"]');
+   if(status){status.value='idea';status.closest('.formfield')?.remove();}
+   const hint=document.createElement('p');hint.className='muted small gp-idea-helper';
+   hint.textContent='Идея сохраняется без праздника и срока. Её можно привязать к человеку и позже превратить в запланированный подарок.';
+   form.prepend(hint);
+ }
+ return template.innerHTML;
+};
+function gpOpenIdea(personId){
+ gpIdeaDraft=true;gpIdeaReturnPerson=personId||'';
+ window.pendingOccasion=null;window.giftPersonId=personId||null;
+ personDetailId=null;selectedGift=null;editId=null;modal='gifts';draw();
+}
+document.addEventListener('click',event=>{
+ const btn=event.target.closest('[data-gp-category],[data-gp-person-new-idea],[data-gp-new-idea]');
+ if(!btn)return;
+ event.preventDefault();event.stopImmediatePropagation();
+ if(btn.hasAttribute('data-gp-category')){gpCategoryFilter=btn.getAttribute('data-gp-category');draw();return;}
+ gpOpenIdea(btn.getAttribute('data-gp-person-new-idea')||'');
+},true);
+document.addEventListener('submit',event=>{
+ const form=event.target;
+ if(form.id!=='record-form'||form.dataset.kind!=='gifts'||!gpIdeaDraft)return;
+ const recipient=String(form.querySelector('[name="personId"]')?.value||gpIdeaReturnPerson||'');
+ const eventField=form.querySelector('[name="eventId"]');if(eventField)eventField.value='';
+ const statusField=form.querySelector('[name="status"]');
+ if(!statusField){const h=document.createElement('input');h.type='hidden';h.name='status';h.value='idea';form.appendChild(h)}else statusField.value='idea';
+ // Schedule UI return after the existing save handler finishes.
+ gpIdeaDraft=false;gpIdeaReturnPerson='';
+ if(recipient)window.setTimeout(()=>{if(modal===null){personDetailId=recipient;personTab='gifts';draw()}},0);
+},true);
+document.addEventListener('click',event=>{
+ if(!event.target.closest('[data-close]') && !event.target.classList?.contains('modal-bg'))return;
+ if(gpIdeaDraft){gpIdeaDraft=false;gpIdeaReturnPerson='';window.giftPersonId=null;}
+},true);
+
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&gpIdeaDraft){gpIdeaDraft=false;gpIdeaReturnPerson='';window.giftPersonId=null;}},true);
 // Consistent naming and no more than a single category badge in any profile header.
 draw();
 })();
@@ -2486,4 +2598,18 @@ document.addEventListener('change', function(e) {
   if (firstLabel) firstLabel.textContent = typeField.value === 'anniversary' ? 'Первый участник годовщины' : 'Человек (необязательно)';
 }, true);
 </script>
+
+<style id="gp-idea-category-style">
+.gp-category-filter{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:-5px 0 18px;max-width:100%;}
+.gp-category-btn{display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--muted);font-weight:700;font-size:13px;line-height:1.2;white-space:nowrap;}
+.gp-category-btn.active{background:var(--accent2);color:var(--accent);border-color:var(--accent);}
+.gp-category-btn:hover{border-color:var(--accent);}
+.gp-category-count{font-size:11px;border-radius:20px;background:var(--panel2);padding:2px 7px;color:inherit;}
+.gp-add-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+.gp-ideas-heading{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.gp-ideas-heading h3{margin-right:auto;}
+.gp-ideas-heading .btn{white-space:normal;}
+.gp-idea-helper{margin:0 0 16px;line-height:1.5;}
+@media(max-width:690px){.gp-category-filter{flex-wrap:nowrap;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:thin;}.gp-category-btn{flex:0 0 auto;}.gp-add-actions{flex-direction:column;align-items:stretch;}.gp-add-actions .btn{width:100%;}.gp-ideas-heading .btn{font-size:12px;padding:8px 10px;}}
+</style>
 <script type="module" src="./firebase-sync.js"></script></body></html>

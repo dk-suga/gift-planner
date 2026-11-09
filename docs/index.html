@@ -1721,7 +1721,9 @@ formModal=function(){
 document.addEventListener('submit',ev=>{
  if(ev.target.id!=='record-form'||ev.target.dataset.kind!=='gifts')return;
  const f=ev.target,fd=new FormData(f),e=byId('events',String(fd.get('eventId')||window.pendingOccasion?.eventId||''));
- if(!v13Individual(e))return;
+ // Birthday and other genuinely single-recipient events are limited to one person.
+ // An anniversary may have two participants and a shared gift for both.
+ if(!v13Individual(e) || e?.type==='anniversary')return;
  const fixed=e.personId||e.autoBirthdayPersonId||String(fd.get('personId')||'');
  const personSelect=f.querySelector('[name="personId"]');if(fixed&&personSelect)personSelect.value=fixed;
  f.querySelectorAll('[name="extraRecipients"]').forEach(input=>{input.checked=false});
@@ -1806,7 +1808,7 @@ document.addEventListener('submit',ev=>{
  if(ev.target.id!=='v13-stock-form')return;ev.preventDefault();ev.stopImmediatePropagation();
  const g=byId('gifts',editId);if(!g)return;const f=new FormData(ev.target);
  const e=byId('events',String(f.get('eventId')||'')),person=String(f.get('personId')||'');
- if(v13Individual(e)&&e.personId&&person&&person!==e.personId){alert('Для этого личного события можно назначить подарок только указанному человеку.');return}
+ if(v13Individual(e)&&e?.type!=='anniversary'&&e.personId&&person&&person!==e.personId){alert('Для этого личного события можно назначить подарок только указанному человеку.');return}
  g.inventoryState='';g.personId=e?.personId||e?.autoBirthdayPersonId||person;g.recipientIds=g.personId?[g.personId]:[];g.eventId=e?.id||'';g.eventYear=Number(f.get('year'))||new Date().getFullYear();g.status='ready';modal=null;editId=null;page='gifts';draw();
 },true);
 

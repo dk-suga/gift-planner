@@ -2589,6 +2589,146 @@ occasionHtml=function(){
  }
  return t.innerHTML;
 };
+// Handmade: import steps into an existing gift and mark manufacturing completion explicitly.
+let gpStageImportTarget = null;
+let gpStageImportTemplate = null;
+let gpReadyConfirmTarget = null;
+const gpWorkDetailPrevious = workshopDetail;
+workshopDetail = function(){
+ const markup=gpWorkDetailPrevious();
+ const project=byId('gifts',selectedGift)||byId('bundleItems',selectedGift);
+ if(!project||!markup)return markup;
+ const frag=document.createElement('template');frag.innerHTML=markup;
+ const dialog=frag.content.querySelector('.modal');
+ if(!dialog)return markup;
+ const steps=db.steps.filter(s=>s.giftId===project.id);
+ const completed=steps.filter(s=>s.done).length;
+ const weightTotal=steps.reduce((sum,s)=>sum+(Number(s.weight)||1),0);
+ const weightDone=steps.filter(s=>s.done).reduce((sum,s)=>sum+(Number(s.weight)||1),0);
+ const progress=weightTotal?Math.round(100*weightDone/weightTotal):0;
+ const progressBar=dialog.querySelector('.progress > div');
+ if(progressBar)progressBar.style.width=progress+'%';
+ const progressTrack=dialog.querySelector('.progress');
+ if(progressTrack){
+   progressTrack.setAttribute('aria-label','Прогресс этапов изготовления: '+progress+'%');
+   progressTrack.insertAdjacentHTML('beforebegin',`<div class="gp-stage-progress-label"><span>Этапы изготовления</span><strong>${completed} из ${steps.length} · ${progress}%</strong></div>`);
+ }
+ const actions=dialog.querySelector('[data-template-save-v10]')?.parentElement;
+ if(actions){
+   const add=document.createElement('button');
+   add.type='button';add.className='btn secondary';
+   add.dataset.gpTemplateImportOpen=project.id;
+   add.textContent='Добавить этапы из шаблона';
+   actions.appendChild(add);
+ }
+ const complete=document.createElement('section');
+ complete.className='gp-handmade-status'+(project.status==='ready'?' is-ready':'');
+ const ready=project.status==='ready';
+ const delivered=project.status==='given';
+ const title=delivered?'Подарок уже вручён':ready?'Изготовление завершено':'Подарок ещё в работе';
+ const sub=ready?'Отмечен как готовый. Он отображается готовым в подарках и плане праздника.'
+   :(!steps.length?'Этапов пока нет. Готовность можно отметить вручную.'
+   :completed===steps.length?'Все этапы выполнены. Подтверди готовность подарка отдельной кнопкой.'
+   :`Выполнено ${completed} из ${steps.length} этапов. Галочки показывают прогресс, но не завершают подарок автоматически.`);
+ const button=delivered?'':ready
+   ?`<button type="button" class="btn secondary" data-gp-work-reopen="${project.id}">Вернуть в работу</button>`
+   :`<button type="button" class="btn" data-gp-work-ready="${project.id}">✓ Отметить готовым</button>`;
+ const ask=gpReadyConfirmTarget===project.id && !ready
+   ?`<div class="gp-ready-confirm"><p>В проекте ещё есть незавершённые этапы (или этапов пока нет). Отметить подарок готовым всё равно?</p><div class="row wrap"><button class="btn" data-gp-work-confirm="${project.id}" type="button">Да, подарок готов</button><button class="btn ghost" data-gp-work-cancel type="button">Отмена</button></div></div>`:'';
+ complete.innerHTML=`<div class="gp-handmade-status-text"><span class="gp-ready-indicator" aria-hidden="true">${ready||delivered?'✓':'◷'}</span><div><strong>${title}</strong><p>${sub}</p></div></div>${button}${ask}`;
+ const materialHeading=[...dialog.querySelectorAll('.section h2')].find(h=>h.textContent?.includes('Материалы проекта'))?.closest('.section');
+ if(materialHeading)materialHeading.before(complete);
+ else if(actions)actions.after(complete);
+ else dialog.append(complete);
+ return frag.innerHTML;
+};
+
+const gpTemplateFormPrevious=formModal;
+formModal=function(){
+ if(modal!=='gpImportWorkshopSteps')return gpTemplateFormPrevious();
+ const project=byId('gifts',gpStageImportTarget)||byId('bundleItems',gpStageImportTarget);
+ if(!project)return '';
+ const templates=Array.isArray(db.projectTemplates)?db.projectTemplates:[];
+ if(!templates.some(t=>t.id===gpStageImportTemplate))gpStageImportTemplate=templates[0]?.id||null;
+ const chosen=templates.find(t=>t.id===gpStageImportTemplate);
+ const existing=new Set(db.steps.filter(s=>s.giftId===project.id).map(s=>String(s.name||'').trim().toLocaleLowerCase('ru-RU')));
+ const stageList=(Array.isArray(chosen?.steps)?chosen.steps:[]).map((stage,index)=>{
+   const duplicate=existing.has(String(stage.name||'').trim().toLocaleLowerCase('ru-RU'));
+   return `<label class="gp-import-stage"><input type="checkbox" name="stageIndex" value="${index}" ${duplicate?'disabled':'checked'}><span><strong>${escapeHtml(stage.name||'Этап')}</strong><small>Вес: ${Number(stage.weight)||1}${duplicate?' · Уже есть в проекте':''}</small></span></label>`;
+ }).join('');
+ const options=templates.map(t=>`<option value="${escapeHtml(t.id)}" ${t.id===gpStageImportTemplate?'selected':''}>${escapeHtml(t.name)} · ${(t.steps||[]).length} этапов</option>`).join('');
+ return `<div class="modal-bg" data-backdrop><div class="modal gp-import-modal"><div class="row between"><div><div class="eyebrow">Мастерская</div><h2>Этапы из шаблона</h2></div><button class="btn ghost" data-gp-work-back type="button" aria-label="Вернуться в проект">✕</button></div><p class="muted small">Проект: <strong>${escapeHtml(project.name)}</strong>. Уже выполненные этапы останутся без изменений.</p>${templates.length?`<form id="gp-import-workshop-form"><div class="formfield"><label for="gp-import-template-select">Шаблон</label><select id="gp-import-template-select" class="field" data-gp-template-choice>${options}</select></div><div class="gp-import-stage-list">${stageList||'<p class="muted small">В шаблоне нет этапов.</p>'}</div><p class="muted small">Совпадающие по названию этапы пропускаются. Материалы не копируются — добавлять их можно отдельно.</p><div class="modal-actions"><button type="button" class="btn secondary" data-gp-work-back>Отмена</button><button type="submit" class="btn" ${stageList?'':'disabled'}>Добавить выбранные этапы</button></div></form>`:`<div class="empty">Сохранённых шаблонов пока нет. Для начала создай этапы в другом handmade-проекте и нажми «Сохранить как шаблон».</div><div class="modal-actions"><button type="button" class="btn secondary" data-gp-work-back>К проекту</button></div>`}</div></div>`;
+};
+
+function gpBackToWorkshop(){modal=null;editId=null;selectedGift=gpStageImportTarget||selectedGift;gpStageImportTarget=null;gpStageImportTemplate=null;draw()}
+document.addEventListener('click',function(ev){
+ const button=ev.target.closest('[data-gp-template-import-open],[data-gp-work-back],[data-gp-work-ready],[data-gp-work-reopen],[data-gp-work-confirm],[data-gp-work-cancel]');
+ const templateBackdrop=modal==='gpImportWorkshopSteps'&&ev.target.classList?.contains('modal-bg');
+ if(!button&&!templateBackdrop)return;
+ ev.preventDefault();ev.stopImmediatePropagation();
+ if(button?.hasAttribute('data-gp-template-import-open')){
+   gpStageImportTarget=button.dataset.gpTemplateImportOpen;
+   gpStageImportTemplate=db.projectTemplates?.[0]?.id||null;
+   gpReadyConfirmTarget=null;
+   modal='gpImportWorkshopSteps';editId=null;draw();return;
+ }
+ if(templateBackdrop||button?.hasAttribute('data-gp-work-back')){gpBackToWorkshop();return}
+ if(button?.hasAttribute('data-gp-work-cancel')){gpReadyConfirmTarget=null;draw();return}
+ const pid=button?.dataset.gpWorkReady||button?.dataset.gpWorkReopen||button?.dataset.gpWorkConfirm;
+ const project=byId('gifts',pid)||byId('bundleItems',pid);
+ if(!project)return;
+ if(button.hasAttribute('data-gp-work-reopen')){
+   project.status='making';gpReadyConfirmTarget=null;draw();return;
+ }
+ const steps=db.steps.filter(s=>s.giftId===project.id);
+ if(button.hasAttribute('data-gp-work-ready')&&(!steps.length||steps.some(s=>!s.done))){
+   gpReadyConfirmTarget=project.id;draw();return;
+ }
+ project.status='ready';gpReadyConfirmTarget=null;draw();
+},true);
+document.addEventListener('change',function(ev){
+ if(ev.target.matches('[data-gp-template-choice]')){
+   gpStageImportTemplate=ev.target.value;draw();return;
+ }
+ // An unchecked manufacturing step reopens a previously completed project.
+ if(ev.target.matches('[data-stepcheck]')){
+   const step=byId('steps',ev.target.dataset.stepcheck);
+   if(!step)return;
+   const project=byId('gifts',step.giftId)||byId('bundleItems',step.giftId);
+   if(project&&project.type==='handmade'){
+     if(!ev.target.checked&&project.status==='ready') project.status='making';
+     else if(ev.target.checked&&project.status==='planned')project.status='making';
+   }
+   gpReadyConfirmTarget=null;
+ }
+},true);
+document.addEventListener('submit',function(ev){
+ if(ev.target.id!=='gp-import-workshop-form')return;
+ ev.preventDefault();ev.stopImmediatePropagation();
+ const project=byId('gifts',gpStageImportTarget)||byId('bundleItems',gpStageImportTarget);
+ const template=db.projectTemplates?.find(t=>t.id===gpStageImportTemplate);
+ if(!project||!template)return;
+ const existing=new Set(db.steps.filter(s=>s.giftId===project.id).map(s=>String(s.name||'').trim().toLocaleLowerCase('ru-RU')));
+ const stages=Array.isArray(template.steps)?template.steps:[];
+ let added=0;
+ for(const raw of new FormData(ev.target).getAll('stageIndex')){
+   const stage=stages[Number(raw)];
+   const name=String(stage?.name||'').trim();
+   const key=name.toLocaleLowerCase('ru-RU');
+   if(!name||existing.has(key))continue;
+   db.steps.push({id:id(),giftId:project.id,name,weight:Math.max(1,Number(stage.weight)||1),done:false});
+   existing.add(key);added++;
+ }
+ if(added>0&&project.status==='ready') project.status='making';
+ gpBackToWorkshop();
+ if(typeof window.v14Toast==='function')window.v14Toast(added?`✓ Добавлено этапов: ${added}`:'Новых этапов не выбрано');
+},true);
+document.addEventListener('keydown',function(ev){
+ if(ev.key==='Escape'&&modal==='gpImportWorkshopSteps'){
+   ev.preventDefault();ev.stopImmediatePropagation();gpBackToWorkshop();
+ }
+},true);
+
 // Consistent naming and no more than a single category badge in any profile header.
 draw();
 })();
@@ -2684,5 +2824,30 @@ document.addEventListener('change', function(e) {
 .gp-ideas-heading .btn{white-space:normal;}
 .gp-idea-helper{margin:0 0 16px;line-height:1.5;}
 @media(max-width:690px){.gp-category-filter{flex-wrap:nowrap;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:thin;}.gp-category-btn{flex:0 0 auto;}.gp-add-actions{flex-direction:column;align-items:stretch;}.gp-add-actions .btn{width:100%;}.gp-ideas-heading .btn{font-size:12px;padding:8px 10px;}}
+</style>
+
+<style id="gp-handmade-update-style">
+.v14-toast{pointer-events:none!important}
+.gp-stage-progress-label{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:12px 0 4px;font-size:13px;color:var(--muted)}
+.gp-stage-progress-label strong{color:var(--text);font-size:14px}
+.gp-handmade-status{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;margin:22px 0;padding:17px;border-radius:16px;border:1px solid var(--line);background:var(--panel2)}
+.gp-handmade-status.is-ready{background:#e5f2eb;border-color:#bfdecf}
+body.dark .gp-handmade-status.is-ready{background:#234033;border-color:#35664f}
+.gp-handmade-status-text{display:flex;align-items:flex-start;gap:12px;flex:1 1 230px;min-width:0}
+.gp-handmade-status-text strong{display:block;font-size:16px}
+.gp-handmade-status-text p{font-size:13px;line-height:1.5;color:var(--muted);margin:5px 0 0;max-width:440px}
+.gp-ready-indicator{display:grid;place-items:center;border-radius:12px;background:var(--panel);color:var(--accent);font-size:23px;font-weight:700;width:40px;height:40px;flex-shrink:0}
+.gp-handmade-status.is-ready .gp-ready-indicator{color:#367965}
+.gp-handmade-status>.btn{max-width:100%;white-space:normal;text-align:center;line-height:1.35}
+.gp-ready-confirm{width:100%;padding-top:12px;border-top:1px solid var(--line)}
+.gp-ready-confirm p{color:var(--text);font-size:13px;margin:0 0 12px}
+.gp-import-stage-list{border:1px solid var(--line);border-radius:15px;max-height:40vh;overflow-y:auto;margin:12px 0}
+.gp-import-stage{padding:12px 14px;display:flex;gap:12px;align-items:flex-start;border-bottom:1px solid var(--line);cursor:pointer}
+.gp-import-stage:last-child{border:0}
+.gp-import-stage span{display:grid;gap:4px;min-width:0}
+.gp-import-stage small{font-size:12px;color:var(--muted)}
+.gp-import-stage input{margin-top:3px}
+.gp-import-modal h2{margin:3px 0 14px}
+@media(max-width:600px){.gp-handmade-status{align-items:stretch}.gp-handmade-status>.btn{width:100%}.gp-import-stage-list{max-height:35vh}}
 </style>
 <script type="module" src="./firebase-sync.js"></script></body></html>

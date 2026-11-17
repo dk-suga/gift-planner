@@ -1332,11 +1332,13 @@ profileHtml=function(){
 home=function(){
  const today=startOfDay(),limit=plusMonths(today,2);
  const incoming=safeList(db.events.map(eventInfo)).filter(x=>x.when<=limit);
- const active=db.gifts.filter(g=>!['idea','ready','given'].includes(g.status));
+ const active=db.gifts.filter(g=>!['idea','ready','given'].includes(g.status))
+  .sort((a,b)=>v18SortKey(v18GiftDate(a)).localeCompare(v18SortKey(v18GiftDate(b)))||String(a.name||'').localeCompare(String(b.name||''),'ru'));
  const pending=combinedPurchasesV10().filter(x=>!x.done).length+groupNeeded().filter(x=>x.missing>0).length;
  const handmade=db.gifts.filter(g=>g.type==='handmade'&&!['ready','given'].includes(g.status)).length+db.bundleItems.filter(x=>x.type==='handmade'&&x.status!=='ready').length;
  const statLink=(target,num,label,icon)=>`<button type="button" data-nav="${target}" class="stat-card-link">${stat(num,label,navIcon(icon))}</button>`;
- const planRows=planEventRowsV10().filter(r=>r.plan&&!r.plan.done&&r.plan.mode!=='simple').sort((a,b)=>String(a.plan.deliveryDate||'9999').localeCompare(String(b.plan.deliveryDate||'9999'))).slice(0,4);
+ const planRows=planEventRowsV10().filter(r=>r.plan&&!r.plan.done&&r.plan.mode!=='simple')
+  .sort((a,b)=>v18SortKey(v18PlanDate(byId('events',a.eventId),a.year)).localeCompare(v18SortKey(v18PlanDate(byId('events',b.eventId),b.year)))||String(byId('events',a.eventId)?.name||'').localeCompare(String(byId('events',b.eventId)?.name||''),'ru')).slice(0,4);
  const planCards=planRows.map(r=>{let event=byId('events',r.eventId);if(!event)return '';let gs=planGifts(r.plan),gsr=giftStats(gs),tasks=syncPlanTasks(r.plan,event),taskDone=tasks.filter(t=>t.done).length;
    // If the user has not assigned gifts yet, the checklist progress is still meaningful.
    const perc=gsr.count?Math.round((gsr.pct+(tasks.length?100*taskDone/tasks.length:0))/2):tasks.length?Math.round(100*taskDone/tasks.length):0;
@@ -1381,7 +1383,7 @@ occasionHtml=function(){
 
 // Full plan listing with progress, one-card-per-event-year.
 plansHub=function(){
- const rows=planEventRowsV10(),extra=db.gifts.filter(g=>!g.eventId&&g.status!=='idea');
+ const rows=planEventRowsV10().sort((a,b)=>v18SortKey(v18PlanDate(byId('events',a.eventId),a.year)).localeCompare(v18SortKey(v18PlanDate(byId('events',b.eventId),b.year)))),extra=db.gifts.filter(g=>!g.eventId&&g.status!=='idea');
  const plans=rows.filter(r=>!!r.plan).map(r=>{const event=byId('events',r.eventId);if(!event)return '';const gs=planGifts({eventId:r.eventId,year:r.year}),s=giftStats(gs),tasks=r.plan&&r.plan.mode!=='simple'?syncPlanTasks(r.plan,event):[];
  const done=tasks.filter(x=>x.done).length,pct=gs.length?Math.round((s.pct+(tasks.length?100*done/tasks.length:0))/(tasks.length?2:1)):tasks.length?Math.round(done/tasks.length*100):0;
  return `<button type="button" class="card v11-plan-card plan-hub-card" data-open-plan-v10="${event.id}" data-plan-year-v10="${r.year}"><div class="row between"><strong>${escapeHtml(event.emoji||'🎁')} ${escapeHtml(event.name)}</strong><span class="pill">${r.year}</span></div><div class="v11-caption">${r.plan?(r.plan.mode==='simple'?'Простой план':'Подробный план'):'Подарки без большого плана'} · ${gs.length} подарков · ${associatedPeopleV10(event,r.year).length} получателей</div><div class="progress"><div style="width:${pct}%"></div></div><span class="v11-decor">${pct}% готовности</span></button>`;}).join('');
@@ -2237,7 +2239,7 @@ const v17Ledger=()=>{
     confirmed:!!s.done,hasActual:!!s.done&&s.cost!==undefined&&s.cost!==''&&s.cost!==null,
     category:s.materialId?'materials':part?'bundle':g&&g.type==='buy'?'buy':'other',
     year:v17Year(yr)|| (g?v17GiftYear(g):v17CurrentYear),date:s.purchasedAt||s.date||'',
-    giftId:g?.id||'',eventId:g?.eventId||s.eventId||'',recipientIds:g?v17Recipients(g):[]});
+    giftId:g?.id||'',eventId:s.eventId||g?.eventId||'',planYear:v17Year(s.eventYear)||(g?v17GiftYear(g):null),recipientIds:g?v17Recipients(g):[]});
  }
  for(const g of db.gifts){
   if(g.status==='idea'||g.archived||g.inventoryState==='stock')continue;
@@ -2245,7 +2247,7 @@ const v17Ledger=()=>{
   if(g.type==='buy'&&!linkedGiftPurchases.has(g.id)){
    const actualDefined=g.actualCost!==undefined&&g.actualCost!==null&&g.actualCost!=='';
    put({id:'gift:'+g.id,origin:'gift',label:g.name,amount:actualDefined?g.actualCost:(g.budget||0),confirmed:isConfirmed,
-      hasActual:isConfirmed&&actualDefined,category:'buy',year:v17Year(String(g.purchasedAt||'').slice(0,4))||y,eventId:g.eventId||'',giftId:g.id,recipientIds:rc,date:g.purchasedAt||''});
+      hasActual:isConfirmed&&actualDefined,category:'buy',year:v17Year(String(g.purchasedAt||'').slice(0,4))||y,planYear:y,eventId:g.eventId||'',planYear:y,giftId:g.id,recipientIds:rc,date:g.purchasedAt||''});
   }
   if(g.type==='bundle'){
    for(const p of parts){
@@ -2254,14 +2256,14 @@ const v17Ledger=()=>{
     const confirmed=p.status==='ready';
     put({id:'part:'+p.id,origin:'bundle',label:p.name,amount:p.cost||0,confirmed,
        hasActual:confirmed&&p.cost!==undefined&&p.cost!==null&&p.cost!=='',category:'bundle',year:v17Year(String(p.purchasedAt||'').slice(0,4))||y,
-       eventId:g.eventId||'',giftId:g.id,recipientIds:rc,date:p.purchasedAt||''});
+       eventId:g.eventId||'',planYear:y,giftId:g.id,recipientIds:rc,date:p.purchasedAt||''});
    }
   }
   // Handmade: an explicitly entered *extra* cost is separate from materials and purchases.
   if(g.type==='handmade' && g.actualCost!==undefined&&g.actualCost!==null&&g.actualCost!==''&&v17Money(g.actualCost)>0){
     put({id:'handmade-extra:'+g.id,origin:'handmade',label:'Дополнительные расходы: '+g.name,
        amount:g.actualCost,confirmed:true,hasActual:true,category:'handmade',year:y,
-       eventId:g.eventId||'',giftId:g.id,recipientIds:rc,date:g.purchasedAt||''});
+       eventId:g.eventId||'',planYear:y,giftId:g.id,recipientIds:rc,date:g.purchasedAt||''});
   }
  }
  // Individual additional expenses entered in the financial dashboard: distinct purchases only.
@@ -2269,7 +2271,7 @@ const v17Ledger=()=>{
   const g=x.giftId?byId('gifts',x.giftId):null;
   put({id:'extra:'+x.id,origin:'extra',label:x.name||'Дополнительный расход',amount:x.amount||0,
     confirmed:true,hasActual:true,category:x.category||'other',year:v17Year(String(x.date||'').slice(0,4))||v17CurrentYear,
-    date:x.date||'',eventId:x.eventId||g?.eventId||'',giftId:x.giftId||'',recipientIds:g?v17Recipients(g):x.personId?[x.personId]:[],note:x.note||''});
+    date:x.date||'',eventId:x.eventId||g?.eventId||'',planYear:v17Year(x.eventYear)||(g?v17GiftYear(g):null),giftId:x.giftId||'',recipientIds:g?v17Recipients(g):x.personId?[x.personId]:[],note:x.note||''});
  }
  return result;
 };
@@ -2278,8 +2280,31 @@ const v17StatsData=(year)=>{
   ledger=v17Ledger().filter(x=>x.year===year),actual=ledger.filter(x=>x.confirmed&&x.hasActual),
   uncertain=ledger.filter(x=>x.confirmed&&!x.hasActual),pending=ledger.filter(x=>!x.confirmed);
  const sum=arr=>v17Money(arr.reduce((acc,x)=>acc+v17Money(x.amount),0));
- const budget=v17Money(gifts.reduce((acc,g)=>acc+v17Money(g.budget),0));
- return {year,gifts,ledger,actual,uncertain,pending,budget,spent:sum(actual),pendingTotal:sum(pending),estimate:sum(uncertain),available:budget-sum(actual),delivered:gifts.filter(g=>g.status==='given').length};
+ // Avoid adding the per-gift limits a second time when the occasion has its own limit.
+ // Both budget and planned gift counts belong to the year of the occasion, not the purchase year.
+ const occasionLimitKeys=new Set();let occasionBudget=0;
+ for(const plan of db.occasionPlans||[]){
+   if(Number(plan.year)!==Number(year))continue;
+   const ev=byId('events',plan.eventId);if(!ev)continue;
+   const raw=plan.budget;
+   if(raw===undefined||raw===null||String(raw).trim()==='')continue;
+   const key=v17EventKey(ev)||'id:'+ev.id;
+   if(occasionLimitKeys.has(key))continue;
+   occasionLimitKeys.add(key);
+   occasionBudget+=v17Money(raw);
+ }
+ let separateGiftBudget=0;
+ for(const g of gifts){
+   const ev=byId('events',g.eventId);
+   const key=ev?(v17EventKey(ev)||'id:'+ev.id):'';
+   if(key && occasionLimitKeys.has(key))continue;
+   separateGiftBudget+=v17Money(g.budget);
+ }
+ const budget=v17Money(occasionBudget+separateGiftBudget);
+ // Spending may precede the occasion, e.g. November 2026 materials for New Year 2027.
+ const budgetLedger=v17Ledger().filter(x=>x.planYear===year||(!x.planYear&&x.year===year));
+ const budgetSpent=sum(budgetLedger.filter(x=>x.confirmed&&x.hasActual));
+ return {year,gifts,ledger,actual,uncertain,pending,budget,occasionBudget:v17Money(occasionBudget),separateGiftBudget:v17Money(separateGiftBudget),budgetSpent,spent:sum(actual),pendingTotal:sum(pending),estimate:sum(uncertain),available:v17Money(budget-budgetSpent),delivered:gifts.filter(g=>g.status==='given').length};
 };
 const v17Bar=(value,max)=>`<div class="v17-bar"><i style="width:${Math.round(max?value/max*100:0)}%"></i></div>`;
 const v17SummaryCard=(title,value,hint,tone)=>`<div class="v17-summary-card ${tone}"><span>${title}</span><strong>${value}</strong><small>${hint}</small></div>`;
@@ -2315,7 +2340,7 @@ window.statisticsV12=function(){
  const byEvent=new Map();for(const x of filterLedger){const key=x.eventId||'none',e=byId('events',key);if(!byEvent.has(key))byEvent.set(key,{name:e?.name||'Без события',total:0,count:0});const a=byEvent.get(key);a.total+=x.amount;a.count++}
  const byPeople=new Map();for(const x of stats.actual){const r=x.recipientIds.length?x.recipientIds:['unassigned'],share=x.amount/r.length;for(const pid of r){const name=byId('people',pid)?.name||'Без получателя';const old=byPeople.get(pid)||{name,total:0};old.total+=share;byPeople.set(pid,old)}}
  const records=filterLedger.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
- const statTiles=`<div class="v17-kpi-grid">${v17SummaryCard('Бюджет подарков',fmt(stats.budget),'Лимиты, не траты','lavender')}${v17SummaryCard('Подтверждённые расходы',fmt(stats.spent),'Только суммы с известной ценой','sage')}${v17SummaryCard('Осталось в бюджете',fmt(stats.available),'Бюджет минус подтверждённые','blue')}${v17SummaryCard('Покупки впереди',fmt(stats.pendingTotal),'Оценка по незакрытым позициям','sand')}${v17SummaryCard('Куплено без точной цены',fmt(stats.estimate),`${stats.uncertain.length} позиций (не входят в факт)`,'neutral')}${v17SummaryCard('Вручено подарков',`${stats.delivered} из ${stats.gifts.length}`,'В выбранном году','neutral')}</div>`;
+ const statTiles=`<div class="v17-kpi-grid">${v17SummaryCard('Бюджет праздников и подарков',fmt(stats.budget),`На ${year} год · праздники ${fmt(stats.occasionBudget)} + отдельные подарки ${fmt(stats.separateGiftBudget)}`,'lavender')}${v17SummaryCard('Подтверждённые расходы',fmt(stats.spent),'Только суммы с известной ценой','sage')}${v17SummaryCard('Осталось в бюджете',fmt(stats.available),`Учтено в планах ${fmt(stats.budgetSpent)} (включая ранние покупки)`,'blue')}${v17SummaryCard('Покупки впереди',fmt(stats.pendingTotal),'Оценка по незакрытым позициям','sand')}${v17SummaryCard('Куплено без точной цены',fmt(stats.estimate),`${stats.uncertain.length} позиций (не входят в факт)`,'neutral')}${v17SummaryCard('Вручено подарков',`${stats.delivered} из ${stats.gifts.length}`,'В выбранном году','neutral')}</div>`;
  const sourceRows=records.map(x=>`<tr><td>${escapeHtml(x.date||'—')}</td><td>${escapeHtml(x.label)}<small>${escapeHtml(v17CategoryLabel[x.category]||x.category)}</small></td><td>${escapeHtml(byId('events',x.eventId)?.name||'—')}</td><td class="number">${fmt(x.amount)}${x.origin==='extra'?` <button class="v17-link" type="button" data-v17-edit-expense="${x.id.slice(6)}" aria-label="Редактировать расход">✎</button> <button class="v17-link" type="button" data-v17-del-expense="${x.id.slice(6)}" aria-label="Удалить расход">×</button>`:''}</td></tr>`).join('');
  const eventRows=[...byEvent.values()].sort((a,b)=>b.total-a.total),max=Math.max(1,...eventRows.map(x=>x.total));
  const personRows=[...byPeople.values()].sort((a,b)=>b.total-a.total).slice(0,15);
@@ -2331,7 +2356,7 @@ window.statisticsV12=function(){
  <section class="v17-finance-section v17-ledger"><div class="row between"><h3>Реестр подтверждённых расходов</h3><button class="btn secondary" data-v17-add-expense>+ Расход</button></div><p class="muted small">Показывает источник каждой суммы; бюджеты не подменяют реальные расходы. Дополнительные траты можно записать вручную.</p><div class="v17-table-wrap"><table><thead><tr><th>Дата</th><th>Расход</th><th>Событие</th><th>Сумма</th></tr></thead><tbody>${sourceRows||'<tr><td colspan="4">Пока нет подтверждённых расходов</td></tr>'}</tbody></table></div></section>
  <section class="v17-finance-section"><h3>Данные требуют уточнения</h3>${stats.uncertain.length?`<p class="muted">${stats.uncertain.length} покупки отмечены выполненными, но фактическая цена не указана. Эти суммы исключены из подтверждённых расходов.</p>${stats.uncertain.map(x=>`<div class="v17-unpriced">${escapeHtml(x.label)} · оценка ${fmt(x.amount)}</div>`).join('')}`:'<p class="muted">Нет отмеченных покупок с неизвестной фактической стоимостью.</p>'}</section>
  </div>`;
- return layout('Статистика','Подтверждённые расходы, бюджеты, подарки и динамика без смешения факта и оценок.',`<div class="v17-stat-top"><div class="formfield"><label>Год</label><select class="field" data-v17-year>${years.map(y=>`<option value="${y}" ${y===year?'selected':''}>${y}</option>`).join('')}</select></div><div class="formfield"><label>Получатель</label><select class="field" data-v17-person><option value="all">Все</option>${db.people.map(p=>`<option value="${p.id}" ${v17FinancePerson===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}</select></div><div class="formfield"><label>Событие</label><select class="field" data-v17-event><option value="all">Все</option>${db.events.map(e=>`<option value="${e.id}" ${v17FinanceEvent===e.id?'selected':''}>${escapeHtml(e.name)}</option>`).join('')}</select></div></div>${statTiles}${panels}<p class="muted small">Фильтры «Получатель» и «Событие» применяются к детализации расходов; общие показатели наверху показывают весь год. Оценки незавершённых покупок могут изменяться; каждый элемент набора и материал учитывается только один раз в рамках известных связей.</p>`,`<button class="btn secondary" data-v17-add-expense>+ Отдельный расход</button>`);
+ return layout('Статистика','Подтверждённые расходы, бюджеты, подарки и динамика без смешения факта и оценок.',`<div class="v17-stat-top"><div class="formfield"><label>Год праздника / покупки</label><select class="field" data-v17-year>${years.map(y=>`<option value="${y}" ${y===year?'selected':''}>${y}</option>`).join('')}</select></div><div class="formfield"><label>Получатель</label><select class="field" data-v17-person><option value="all">Все</option>${db.people.map(p=>`<option value="${p.id}" ${v17FinancePerson===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}</select></div><div class="formfield"><label>Событие</label><select class="field" data-v17-event><option value="all">Все</option>${db.events.map(e=>`<option value="${e.id}" ${v17FinanceEvent===e.id?'selected':''}>${escapeHtml(e.name)}</option>`).join('')}</select></div></div><p class="v19-budget-explain muted small">Бюджеты праздников относятся к году празднования, а расходы — к дате покупки. Покупка в 2026 году для Нового года 2027 уменьшает бюджет плана 2027 года, но остаётся в тратах 2026 года. Если у праздника задан общий бюджет, лимиты входящих в него подарков не прибавляются второй раз.</p>${statTiles}${panels}<p class="muted small">Фильтры «Получатель» и «Событие» применяются к детализации расходов; общие показатели наверху показывают весь год. Оценки незавершённых покупок могут изменяться; каждый элемент набора и материал учитывается только один раз в рамках известных связей.</p>`,`<button class="btn secondary" data-v17-add-expense>+ Отдельный расход</button>`);
 };
 
 // All chosen recipients of the annual plan remain visible even before gifts are assigned.
@@ -2748,12 +2773,13 @@ function v18PlanDate(e,y){
   if(!e)return '9999-12-31';
   const year=Number(y)||new Date().getFullYear();
   const d=dateAtYear(e,year)||((e.repeat==='once'||e.repeat==='never')?e.date:'')||'';
-  return /^\d{4}-\d{2}-\d{2}$/.test(String(d))?String(d):`${year}-12-31`;
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(d))?String(d):'9999-12-31';
 }
 function v18SortKey(date){
   const today=v18NowDay();
   // Pending dates first, chronological. Past occasions after, most recently elapsed first.
-  return date>=today?`0${date}`:`1${String(9999-Number(date.slice(0,4))).padStart(4,'0')}-${String(12-Number(date.slice(5,7))).padStart(2,'0')}-${String(31-Number(date.slice(8,10))).padStart(2,'0')}`;
+  if(!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date.startsWith('9999'))return '3';
+  return date>=today?'0'+date:'1'+String(99999999-Number(date.replace(/-/g,''))).padStart(8,'0');
 }
 function v18GiftDate(g){return g?.eventId?v18PlanDate(byId('events',g.eventId),Number(g.eventYear)||new Date().getFullYear()):'9999-12-31'}
 function v18ReorderCards(parent,selector,dateFn){
@@ -2922,19 +2948,20 @@ const gpMaterialEventName=(eventId,year)=>{
   const e=byId('events',eventId);
   return e ? `${e.name}${year?' · '+year:''}` : '';
 };
+const gpMaterialMonthsAgo=(date)=>{const day=new Date();day.setHours(0,0,0,0);const floor=new Date(day);floor.setMonth(floor.getMonth()-3);const floorISO=[floor.getFullYear(),String(floor.getMonth()+1).padStart(2,'0'),String(floor.getDate()).padStart(2,'0')].join('-');return /^\d{4}-\d{2}-\d{2}$/.test(String(date||''))&&date>=floorISO&&date<=v18NowDay()};
 const gpMaterialSourceRecords=()=>{
   const shopping=(db.shopping||[])
-    .filter(s=>s.done && s.materialId)
+    .filter(s=>s.done&&gpMaterialMonthsAgo(s.purchasedAt||s.date))
     .map(s=>({source:'shopping',id:String(s.id),record:s,
-      name:s.name||byId('materials',s.materialId)?.name||'Покупка материала',
+      name:s.name||byId('materials',s.materialId)?.name||'Покупка',
       amount:Number(s.cost)||0,date:s.purchasedAt||s.date||'',
       giftId:s.giftId||'',eventId:s.eventId||'',eventYear:Number(s.eventYear)||0}));
   const manual=(db.expenses||[])
-    .filter(x=>x.category==='materials')
+    .filter(x=>gpMaterialMonthsAgo(x.date))
     .map(x=>({source:'expense',id:String(x.id),record:x,
-      name:x.name||'Материалы',amount:Number(x.amount)||0,date:x.date||'',
+      name:x.name||'Расход',amount:Number(x.amount)||0,date:x.date||'',
       giftId:x.giftId||'',eventId:x.eventId||'',eventYear:Number(x.eventYear)||0}));
-  return [...shopping,...manual].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  return [...shopping,...manual].sort((a,b)=>String(b.date).localeCompare(String(a.date))||a.name.localeCompare(b.name,'ru'));
 };
 const gpMaterialExpenseOwnedByGift=(item)=>{
   const gift=item.giftId?byId('gifts',item.giftId):null;
@@ -2985,13 +3012,16 @@ occasionHtml=function(){
 const gpMaterialForm=()=>{
   const event=byId('events',gpMaterialAttachContext?.eventId),year=gpMaterialAttachContext?.year;
   if(!event)return '';
-  const items=gpMaterialSourceRecords().filter(x=>gpMaterialExpenseEligible(x,event.id,year));
+  const items=gpMaterialSourceRecords();
   const label=x=>{
     const eventName=x.eventId?gpMaterialEventName(x.eventId,x.eventYear):'';
     const giftName=x.giftId?byId('gifts',x.giftId)?.name:'';
-    return `<label class="gp-material-option"><input type="radio" name="item" value="${escapeHtml(x.source+':'+x.id)}" required><span><strong>${escapeHtml(x.name)}</strong><small>${fmt(x.amount)}${x.date?' · куплено '+escapeHtml(x.date):''} · ${x.source==='shopping'?'Покупки':'Реестр расходов'}${eventName?' · сейчас: '+escapeHtml(eventName):''}${giftName?' · подарок: '+escapeHtml(giftName):''}</small></span></label>`;
+    const already=gpMaterialIsLinked(x,event.id,year);
+    const eligible=gpMaterialExpenseEligible(x,event.id,year);
+    const blocked=already?'Уже привязано к этому плану':(!eligible?'Закреплено за подарком другого праздника':'');
+    return `<label class="gp-material-option ${already?'gp-material-linked-option':''} ${!eligible?'gp-material-disabled':''}"><input type="checkbox" name="item" value="${escapeHtml(x.source+':'+x.id)}" ${!eligible?'disabled':''}><span><strong>${escapeHtml(x.name)}</strong><small>${fmt(x.amount)}${x.date?' · куплено '+escapeHtml(x.date):''} · ${x.source==='shopping'?'Покупки':'Реестр расходов'}${eventName?' · сейчас: '+escapeHtml(eventName):''}${giftName?' · подарок: '+escapeHtml(giftName):''}${blocked?' · '+blocked:''}</small></span></label>`;
   };
-  return `<div class="modal-bg" data-backdrop><div class="modal gp-material-modal"><div class="row between"><div><h2>Привязать существующий расход</h2><p class="muted small">${escapeHtml(event.name)} · ${year}</p></div><button type="button" class="btn ghost" data-gp-material-cancel>✕</button></div><p class="muted small">Выбери уже внесённую покупку материала или расход. Сумма, дата и домашний запас не изменятся. Покупка останется одной записью.</p>${items.length?`<form id="gp-material-attach-form"><div class="gp-material-options">${items.map(label).join('')}</div><p class="muted small">Если расход связан с другим праздником, он будет перенесён в этот план, а не скопирован. Материалы, уже закреплённые за подарком другого праздника, здесь не предлагаются.</p><div class="modal-actions"><button class="btn secondary" type="button" data-gp-material-cancel>Отмена</button><button class="btn" type="submit">Привязать к празднику</button></div></form>`:`<div class="empty">Нет свободных расходов на материалы. Отметь материал купленным в «Покупках» или внеси расход в финансовом реестре.</div><div class="modal-actions"><button class="btn secondary" type="button" data-gp-material-cancel>Закрыть</button></div>`}</div></div>`;
+  return `<div class="modal-bg" data-backdrop><div class="modal gp-material-modal"><div class="row between"><div><h2>Привязать существующий расход</h2><p class="muted small">${escapeHtml(event.name)} · ${year}</p></div><button type="button" class="btn ghost" data-gp-material-cancel>✕</button></div><p class="muted small">Все отмеченные покупки и внесённые расходы за последние три месяца. Можно выбрать несколько. Дата, сумма и домашние остатки не изменятся; одна покупка учитывается один раз.</p>${items.length?`<form id="gp-material-attach-form"><div class="row between gp-material-selection"><strong>Выбрать покупки</strong><button class="linklike" type="button" data-gp-material-select-all>Выбрать все доступные</button></div><div class="gp-material-options">${items.map(label).join('')}</div><p class="muted small">Если расход уже связан с другим праздником, он будет перенесён, а не скопирован. Покупки, закреплённые за подарком другого праздника, можно посмотреть здесь, но не переносить отдельно от подарка.</p><div class="modal-actions"><button class="btn secondary" type="button" data-gp-material-cancel>Отмена</button><button class="btn" type="submit">Привязать выбранные</button></div></form>`:`<div class="empty">За последние три месяца пока нет завершённых покупок с датой или отдельных расходов. Добавь покупку в «Покупки» либо внеси расход в реестр.</div><div class="modal-actions"><button class="btn secondary" type="button" data-gp-material-cancel>Закрыть</button></div>`}</div></div>`;
 };
 const gpMaterialPrevFormModal=formModal;
 formModal=function(){
@@ -3006,9 +3036,14 @@ const gpMaterialReturn=()=>{
   modal='occasion';gpMaterialAttachContext=null;draw();
 };
 document.addEventListener('click',ev=>{
-  const b=ev.target.closest('[data-gp-material-attach],[data-gp-material-unlink],[data-gp-material-cancel]');
+  const b=ev.target.closest('[data-gp-material-attach],[data-gp-material-unlink],[data-gp-material-cancel],[data-gp-material-select-all]');
   if(!b)return;
   ev.preventDefault();ev.stopImmediatePropagation();
+  if(b.hasAttribute('data-gp-material-select-all')){
+    const items=[...document.querySelectorAll('#gp-material-attach-form input[name=\"item\"]:not(:disabled)')];
+    const all=items.length>0&&items.every(x=>x.checked);items.forEach(x=>{x.checked=!all});
+    b.textContent=all?'Выбрать все доступные':'Снять выбор';return;
+  }
   if(b.hasAttribute('data-gp-material-attach')){
     gpMaterialAttachContext={eventId:b.dataset.gpMaterialAttach,year:Number(b.dataset.gpMaterialYear)};
     modal='gpMaterialAttach';draw();return;
@@ -3027,16 +3062,16 @@ document.addEventListener('submit',ev=>{
   ev.preventDefault();ev.stopImmediatePropagation();
   const context=gpMaterialAttachContext;
   if(!context||!byId('events',context.eventId))return;
-  const val=String(new FormData(ev.target).get('item')||'');
-  const [source,...parts]=val.split(':'),recordId=parts.join(':');
-  const item=gpMaterialSourceRecords().find(x=>x.source===source&&x.id===recordId);
-  if(!item||!gpMaterialExpenseEligible(item,context.eventId,context.year))return;
-  if(item.eventId && !gpMaterialIsLinked(item,context.eventId,context.year)){
-    if(!confirm('Расход уже привязан к другому празднику. Перенести его в этот план без дублирования суммы?'))return;
+  const values=new FormData(ev.target).getAll('item').map(String);
+  if(!values.length){window.v14Toast?.('Выбери хотя бы одну покупку.');return;}
+  const available=gpMaterialSourceRecords();
+  const records=values.map(val=>{const [source,...parts]=val.split(':');return available.find(x=>x.source===source&&x.id===parts.join(':'))});
+  if(records.some(item=>!item||!gpMaterialExpenseEligible(item,context.eventId,context.year)))return;
+  if(records.some(item=>item.eventId&&!gpMaterialIsLinked(item,context.eventId,context.year))){
+    if(!confirm('Некоторые расходы привязаны к другим праздникам. Перенести их без создания копий?'))return;
   }
-  item.record.eventId=context.eventId;
-  item.record.eventYear=context.year;
-  gpMaterialReturn();window.v14Toast?.('✓ Существующий расход привязан без повторной покупки.');
+  for(const item of records){item.record.eventId=context.eventId;item.record.eventYear=context.year}
+  gpMaterialReturn();window.v14Toast?.('✓ Привязано расходов: '+records.length+'. Новых покупок не создано.');
 },true);
 
 // Consistent naming and no more than a single category badge in any profile header.
@@ -3197,5 +3232,9 @@ body.dark .gp-handmade-status.is-ready{background:#234033;border-color:#35664f}
 .gp-material-linked-item:first-of-type{margin-top:8px}
 .gp-material-linked-item span{overflow-wrap:anywhere}
 @media(max-width:700px){.v18-occasion-expenses .btn{width:100%}.gp-material-modal{padding:16px}.gp-material-linked-item{align-items:flex-start}}
+.gp-material-disabled{opacity:.58;cursor:default}
+.gp-material-disabled input{cursor:not-allowed}
+.gp-material-selection{margin:10px 0 6px;flex-wrap:wrap}
+.v19-budget-explain{margin:12px 0 18px;line-height:1.5;background:var(--panel);border:1px solid var(--line);padding:13px 16px;border-radius:15px}
 </style>
 <script type="module" src="./firebase-sync.js"></script></body></html>

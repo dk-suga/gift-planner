@@ -458,6 +458,38 @@ body.dark .v17-summary-card.lavender{background:#392e49}body.dark .v17-summary-c
 .gp-finance-unaccounted>strong{display:block;margin:0 0 8px}
 .gp-finance-unaccounted>div{display:flex;justify-content:space-between;gap:10px;padding:7px 0}
 .gp-finance-unaccounted b{white-space:nowrap}
+</style><style id="gp-compact-purchase-action-style">
+/* A light utility row instead of an oversized gray block. */
+.occasion-modal .v18-occasion-expenses.gp-simple-plan-link {
+  display:flex!important;align-items:center!important;justify-content:space-between!important;
+  flex-direction:row!important;gap:16px!important;margin:12px 0 18px!important;
+  border:1px solid var(--line)!important;border-radius:16px!important;
+  background:var(--panel)!important;padding:12px 16px!important;
+  box-shadow:none!important;min-width:0;
+}
+.gp-simple-plan-link .gp-link-copy {display:flex;flex-direction:column;gap:3px;min-width:0}
+.gp-simple-plan-link .gp-link-title {font-size:14px;line-height:1.35;color:var(--text);font-weight:750}
+.gp-simple-plan-link .gp-link-description {font-size:12px;line-height:1.4;color:var(--muted)}
+.occasion-modal .v18-occasion-expenses.gp-simple-plan-link > .gp-link-action {
+  flex:0 0 auto!important;width:auto!important;max-width:100%;min-height:40px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:#e5f1f8!important;border:1px solid #d6e9f3!important;border-radius:12px!important;
+  color:#467f9d!important;font-size:13px;font-weight:750;padding:9px 14px;
+  box-shadow:none!important;white-space:nowrap;
+}
+.occasion-modal .v18-occasion-expenses.gp-simple-plan-link > .gp-link-action:hover{background:#d8eaf5!important}
+body.dark .occasion-modal .v18-occasion-expenses.gp-simple-plan-link > .gp-link-action {
+  background:#283947!important;border-color:#3c5769!important;color:#a8d1e7!important;
+}
+@media(max-width:600px){
+  .occasion-modal .v18-occasion-expenses.gp-simple-plan-link {
+    flex-direction:column!important;align-items:stretch!important;gap:12px!important;
+    padding:14px!important;
+  }
+  .occasion-modal .v18-occasion-expenses.gp-simple-plan-link > .gp-link-action {
+    width:100%!important;white-space:normal!important;
+  }
+}
 </style></head><body data-cloud-status="loading"><div id="root"></div><div id="cloud-gate" class="gp-gate" role="dialog" aria-modal="true" aria-labelledby="gp-gate-title"><div class="gp-gate-card"><div class="gp-gate-icon">🎁</div><h1 id="gp-gate-title">Gift Planner</h1><p id="gp-gate-description">Подключаю личное пространство…</p><div id="gp-login-fields" hidden><label>Email<input type="email" id="gp-login-email" autocomplete="username" placeholder="Твой email"></label><label>Пароль<input type="password" id="gp-login-pass" autocomplete="current-password" placeholder="Пароль входа в приложение"></label><button id="gp-login-btn" type="button">Войти</button></div><div class="gp-gate-actions"><button id="gp-retry" type="button" hidden>Повторить</button><button id="gp-demo" type="button" hidden aria-hidden="true">Демо</button></div><p id="gp-gate-error" role="alert" hidden></p></div></div><div id="gp-sync-bar" class="gp-sync-bar" role="status" aria-live="polite" hidden></div><script>
 const KEY='gift-planner-lavender-v1', NAV=[['home','⌂','Главная'],['calendar','▦','Календарь'],['people','👥','Люди'],['gifts','🎁','Подарки'],['workshop','🧶','Мастерская'],['shopping','🛒','Покупки'],['settings','⚙','Настройки']];
 const NAV_ICONS={home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="m9 16 2 2 4-4"/>',people:'<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 11a3 3 0 1 0-1-6M18 14a5 5 0 0 1 3 5v1"/>',gifts:'<rect x="3" y="10" width="18" height="11" rx="2"/><path d="M2 7h20v4H2zM12 7v14M12 7c-5-1-7-3-6-5 2-3 6 1 6 5zm0 0c5-1 7-3 6-5-2-3-6 1-6 5z"/>',workshop:'<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8 8l13 12M8 16 21 4"/>',shopping:'<path d="M3 10h18l-2 11H5L3 10ZM8 10l4-7 4 7M9 14v3m6-3v3"/>',settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>',more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'};
@@ -3213,14 +3245,25 @@ occasionHtml=function(){
  const row=t.content.querySelector('.v18-occasion-expenses');
  if(!row)return html;
  // In a holiday plan: ONE action, no duplicate buttons for creating expenses/purchases.
+ const existing=gpMaterialLinkedRecords(e.id,year);
+ const copy=document.createElement('div');
+ copy.className='gp-link-copy';
+ const title=document.createElement('strong');
+ title.className='gp-link-title';
+ title.textContent='Покупки для праздника';
+ const description=document.createElement('span');
+ description.className='gp-link-description';
+ description.textContent=existing.length
+  ? `Привязано позиций: ${existing.length}`
+  : 'Добавь ранее внесённые покупки или материалы';
+ copy.append(title,description);
  const button=document.createElement('button');
- button.type='button';button.className='btn secondary';
- button.textContent='Привязать покупку';
+ button.type='button';button.className='btn gp-link-action';
+ button.textContent='+ Привязать покупку';
  button.dataset.gpMaterialAttach=e.id;
  button.dataset.gpMaterialYear=String(year);
- row.replaceChildren(button);
+ row.replaceChildren(copy,button);
  row.classList.add('gp-simple-plan-link');
- const existing=gpMaterialLinkedRecords(e.id,year);
  if(existing.length){
   const list=document.createElement('div');list.className='gp-material-linked';
   list.innerHTML=`<strong>Покупки, привязанные к плану</strong>${existing.map(x=>`<div class="gp-material-linked-item"><span>${escapeHtml(x.name)} · ${fmt(x.amount)} · ${x.done?'Куплено':'Нужно купить'}</span><button class="linklike" type="button" data-gp-material-unlink="${escapeHtml(x.source+':'+x.id)}" data-gp-material-event="${escapeHtml(e.id)}" data-gp-material-year="${year}">Убрать связь</button></div>`).join('')}`;
@@ -3294,17 +3337,6 @@ document.addEventListener('click',ev=>{
 // Highlight already-linked purchases which are not yet in confirmed spending.
 // This catches real-world legacy records with missing prices or unfinished status
 // without silently treating an unbought item as spent money.
-const gpPlanUncountedLinked=(event,year,confirmedRows)=>{
- const included=new Set(confirmedRows.map(x=>x.id));
- const linked=gpMaterialLinkedRecords(event.id,year);
- const missing=linked.filter(x=>!included.has((x.source==='shopping'?'shopping:':'extra:')+x.id));
- if(!missing.length)return '';
- return `<div class="gp-finance-unaccounted"><strong>Привязаны к плану, но пока не входят в факт:</strong>${missing.map(x=>{
- const price=x.record.cost??x.record.amount;
- const reason=!x.done?'Ещё не куплено':price==null||String(price).trim()===''?'Не указана цена':'Требуется проверить год или связь записи';
- return `<div><span>${escapeHtml(x.name)} · ${escapeHtml(reason)}</span><b>${fmt(x.amount)}</b></div>`;
- }).join('')}</div>`;
-};
 const gpPlanConfirmedRows = (event, occasionYear) => gpConfirmedOccasionRows(event, occasionYear);
 
 const gpOldOccasionBeforeTotalFix = occasionHtml;
@@ -3335,10 +3367,6 @@ occasionHtml = function () {
       : 'Бюджет не задан';
   }
   budgetRow.classList.toggle('over', budgetSpecified && spent > limit);
-  const explanation = document.createElement('details');
-  explanation.className = 'gp-finance-expander gp-finance-plan-breakdown';
-  explanation.innerHTML = '<summary>Что входит в фактические расходы</summary>' + gpFinanceDetails(rows) + gpPlanUncountedLinked(event, occasionYear, rows);
-  budgetRow.after(explanation);
   return template.innerHTML;
 };
 

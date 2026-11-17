@@ -2289,14 +2289,20 @@ const v17ExpenseForm=()=>{
  const r=v17ExpenseEditId?db.expenses.find(x=>x.id===v17ExpenseEditId):{};
  if(!r && v17ExpenseEditId)return '';
  const e=r||{},pe=db.people,events=db.events;
+ const v18Link=v18ExpenseContext||{};
+ const selectedGiftId=e.giftId||(!v17ExpenseEditId?v18Link.giftId||'':'');
+ const selectedEventId=e.eventId||(!v17ExpenseEditId?v18Link.eventId||'':'');
+ const selectedPlanYear=Number(e.eventYear||(!v17ExpenseEditId?v18Link.eventYear:0)||new Date().getFullYear());
  const inputs=`<label>Название *<input class="field" name="name" required value="${escapeHtml(e.name||'')}" placeholder="Например: подарочная коробка"></label>
  <label>Сумма, ₽ *<input class="field" type="number" step="0.01" min="0.01" name="amount" required value="${escapeHtml(e.amount||'')}"></label>
  <label>Дата расхода *<input class="field" type="date" required name="date" value="${escapeHtml(e.date||v17Today())}"></label>
  <label>Категория<select class="field" name="category">${[['other','Прочее'],['buy','Покупной подарок'],['materials','Материалы'],['handmade','Handmade'],['bundle','Часть набора'],['packaging','Упаковка'],['delivery','Доставка']].map(([k,l])=>`<option value="${k}" ${e.category===k?'selected':''}>${l}</option>`).join('')}</select></label>
- <label>Связать с событием<select class="field" name="eventId"><option value="">Без события</option>${events.map(x=>`<option value="${x.id}" ${e.eventId===x.id?'selected':''}>${escapeHtml(x.name)}</option>`).join('')}</select></label>
+ <label>Подарок (необязательно)<select class="field" name="giftId"><option value="">Без привязки к подарку</option>${db.gifts.filter(g=>!g.archived && g.status!=='idea').map(g=>`<option value="${g.id}" ${selectedGiftId===g.id?'selected':''}>${escapeHtml(g.name)}</option>`).join('')}</select></label>
+ <label>Связать с событием<select class="field" name="eventId"><option value="">Без события</option>${events.map(x=>`<option value="${x.id}" ${selectedEventId===x.id?'selected':''}>${escapeHtml(x.name)}</option>`).join('')}</select></label>
+ <label>Год плана<select class="field" name="eventYear">${[...new Set([new Date().getFullYear()-1,new Date().getFullYear(),new Date().getFullYear()+1,...db.occasionPlans.map(p=>Number(p.year)),...db.gifts.map(g=>Number(g.eventYear)),selectedPlanYear].filter(y=>y>=2000&&y<=2200))].sort((a,b)=>a-b).map(y=>`<option value="${y}" ${selectedPlanYear===y?'selected':''}>${y}</option>`).join('')}</select></label>
  <label>Человек (необязательно)<select class="field" name="personId"><option value="">Не выбран</option>${pe.map(x=>`<option value="${x.id}" ${e.personId===x.id?'selected':''}>${escapeHtml(x.name)}</option>`).join('')}</select></label>
  <label>Заметка<textarea class="field" name="note">${escapeHtml(e.note||'')}</textarea></label>`;
- return `<div class="modal-bg" data-backdrop><div class="modal v17-modal"><div class="row between"><h2>${v17ExpenseEditId?'Изменить расход':'Добавить расход'}</h2><button class="btn ghost" type="button" data-close aria-label="Закрыть">✕</button></div><p class="muted small">Добавляй сюда только отдельные расходы, не включённые в уже отмеченную покупку подарка или материала.</p><form id="v17-expense-form"><div class="v17-form-grid">${inputs}</div><div class="modal-actions"><button type="button" class="btn secondary" data-close>Отмена</button><button type="submit" class="btn">Сохранить</button></div></form></div></div>`;
+ return `<div class="modal-bg" data-backdrop><div class="modal v17-modal"><div class="row between"><h2>${v17ExpenseEditId?'Изменить расход':'Добавить расход'}</h2><button class="btn ghost" type="button" data-close aria-label="Закрыть">✕</button></div><p class="muted small">Отдельный подтверждённый расход: материалы, упаковка или доставка. Не записывай повторно стоимость уже отмеченной покупки.</p><form id="v17-expense-form"><div class="v17-form-grid">${inputs}</div><div class="modal-actions"><button type="button" class="btn secondary" data-close>Отмена</button><button type="submit" class="btn">Сохранить</button></div></form></div></div>`;
 };
 const v17CategoryLabel={buy:'Покупные подарки',bundle:'Элементы наборов',handmade:'Handmade (доп.)',materials:'Материалы',packaging:'Упаковка',delivery:'Доставка',other:'Другие расходы'};
 window.statisticsV12=function(){
@@ -2434,8 +2440,13 @@ document.addEventListener('submit',ev=>{
  if(!Number.isFinite(amount)||amount<=0){window.v14Toast?.('Сумма должна быть больше нуля.');return}
  const saved=v17ExpenseEditId?db.expenses.find(x=>x.id===v17ExpenseEditId):{id:id()};
  if(!saved)return;
- Object.assign(saved,{name:String(fd.get('name')||'').trim(),amount:v17Money(amount),date:String(fd.get('date')||v17Today()),category:String(fd.get('category')||'other'),eventId:String(fd.get('eventId')||''),personId:String(fd.get('personId')||''),note:String(fd.get('note')||'').trim()});
- if(!v17ExpenseEditId)db.expenses.push(saved);v17ExpenseEditId=null;modal=null;page='statistics';draw();window.v14Toast?.('✓ Расход сохранён в финансовом реестре.');
+ Object.assign(saved,{name:String(fd.get('name')||'').trim(),amount:v17Money(amount),date:String(fd.get('date')||v17Today()),category:String(fd.get('category')||'other'),eventId:String(fd.get('eventId')||''),eventYear:Number(fd.get('eventYear'))||new Date().getFullYear(),giftId:String(fd.get('giftId')||''),personId:String(fd.get('personId')||''),note:String(fd.get('note')||'').trim()});
+ if(!v17ExpenseEditId)db.expenses.push(saved);v17ExpenseEditId=null;modal=null;
+ const ret=v18ExpenseReturn;v18ExpenseReturn=null;v18ExpenseContext=null;
+ if(ret?.kind==='occasion'){page=ret.page||page;editId=ret.eventId;window.occasionYear=ret.year;occasionEditMode=false;modal='occasion'}
+ else if(ret?.kind==='gift'){page=ret.page||'gifts';editId=ret.giftId;modal='giftViewV10'}
+ else page=ret?.page||'statistics';
+ draw();window.v14Toast?.('✓ Расход сохранён и учтён в аналитике.');
 },true);
 
 // Cloud settings override: previous visual versions replaced the original
@@ -2729,6 +2740,305 @@ document.addEventListener('keydown',function(ev){
  }
 },true);
 
+
+// Nov 17 update: manual material costs, chronological plans, quick gift controls.
+let v18ExpenseContext=null,v18ExpenseReturn=null,v18QuickGift=null;
+const v18NowDay=()=>new Date().toISOString().slice(0,10);
+function v18PlanDate(e,y){
+  if(!e)return '9999-12-31';
+  const year=Number(y)||new Date().getFullYear();
+  const d=dateAtYear(e,year)||((e.repeat==='once'||e.repeat==='never')?e.date:'')||'';
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(d))?String(d):`${year}-12-31`;
+}
+function v18SortKey(date){
+  const today=v18NowDay();
+  // Pending dates first, chronological. Past occasions after, most recently elapsed first.
+  return date>=today?`0${date}`:`1${String(9999-Number(date.slice(0,4))).padStart(4,'0')}-${String(12-Number(date.slice(5,7))).padStart(2,'0')}-${String(31-Number(date.slice(8,10))).padStart(2,'0')}`;
+}
+function v18GiftDate(g){return g?.eventId?v18PlanDate(byId('events',g.eventId),Number(g.eventYear)||new Date().getFullYear()):'9999-12-31'}
+function v18ReorderCards(parent,selector,dateFn){
+  const cards=[...parent.querySelectorAll(selector)];
+  const sameParent=new Map();
+  cards.forEach(c=>{const p=c.parentElement;if(!p)return;const list=sameParent.get(p)||[];list.push(c);sameParent.set(p,list)});
+  for(const [p,items] of sameParent){
+    if(items.length<2)continue;
+    const ordered=items.slice().sort((a,b)=>v18SortKey(dateFn(a)).localeCompare(v18SortKey(dateFn(b))));
+    const anchor=items[0];
+    for(const el of ordered)p.appendChild(el);
+  }
+}
+const v18OldGifts=gifts;
+gifts=function(){
+ const frag=document.createElement('template');frag.innerHTML=v18OldGifts();
+ const cards=[...frag.content.querySelectorAll('.gift-list-card')];
+ for(const card of cards){
+   const giftId=card.querySelector('[data-gift-view-v10]')?.dataset.giftViewV10;
+   const g=byId('gifts',giftId);if(!g)continue;
+   const manual=(db.expenses||[]).filter(x=>x.giftId===g.id).reduce((a,x)=>a+(Number(x.amount)||0),0);
+   const summary=card.querySelector('.budget-small');
+   if(summary&&manual>0){
+     const total=(Number(budgetFor(g).amount)||0)+manual;
+     const spans=summary.querySelectorAll(':scope > span');
+     if(spans[0])spans[0].textContent='Учтённые затраты, включая дополнительные: '+fmt(total);
+     if(spans[1]&&Number(g.budget)>0)spans[1].textContent=total>Number(g.budget)?'⚠ Превышение '+fmt(total-Number(g.budget)):'Лимит '+fmt(g.budget);
+     summary.classList.toggle('over',total>Number(g.budget)&&Number(g.budget)>0);
+   }
+   const controls=card.querySelector('.row.wrap');if(!controls)continue;
+   controls.insertAdjacentHTML('beforeend',`<details class="v18-quick"><summary>Действия</summary><div class="v18-quick-actions"><button class="v18-action" type="button" data-v18-set-status="${g.id}" data-v18-status="ready" ${g.status==='ready'?'disabled':''}>✓ Готов</button><button class="v18-action" type="button" data-v18-set-status="${g.id}" data-v18-status="given" ${g.status==='given'?'disabled':''}>🎁 Вручён</button><button class="v18-action" type="button" data-v18-actual="${g.id}">₽ Потрачено</button><button class="v18-action" type="button" data-v18-expense="${g.id}">+ Материалы / расход</button></div></details>`);
+ }
+ v18ReorderCards(frag.content,'.gift-list-card',node=>v18GiftDate(byId('gifts',node.querySelector('[data-gift-view-v10]')?.dataset.giftViewV10)));
+ return frag.innerHTML;
+};
+const v18OldHome=home;
+home=function(){
+ const frag=document.createElement('template');frag.innerHTML=v18OldHome();
+ v18ReorderCards(frag.content,'.v11-plan-card',node=>v18PlanDate(byId('events',node.dataset.openPlanV10),node.dataset.planYearV10));
+ return frag.innerHTML;
+};
+const v18OldPlansHub=plansHub;
+plansHub=function(){
+ const frag=document.createElement('template');frag.innerHTML=v18OldPlansHub();
+ v18ReorderCards(frag.content,'.v11-plan-card',node=>v18PlanDate(byId('events',node.dataset.openPlanV10),node.dataset.planYearV10));
+ // Keep unplanned event cards in the same upcoming-first order.
+ v18ReorderCards(frag.content,'.plan-hub-card:not(.v11-plan-card)',node=>v18PlanDate(byId('events',node.dataset.openPlanV10),node.dataset.planYearV10));
+ return frag.innerHTML;
+};
+window.plansHubV10=plansHub;
+function v18RelatedExpenseTotal(eventId,year){
+ return (db.expenses||[]).filter(x=>{
+   const g=byId('gifts',x.giftId);
+   const e=x.eventId||g?.eventId;
+   const expenseYear=Number(x.eventYear)||Number(String(x.date||'').slice(0,4));
+   return e===eventId&&expenseYear===Number(year);
+ }).reduce((a,x)=>a+(Number(x.amount)||0),0);
+}
+const v18OldOccasion=occasionHtml;
+occasionHtml=function(){
+ let html=v18OldOccasion();const e=byId('events',editId);if(!e||!html)return html;
+ const t=document.createElement('template');t.innerHTML=html;
+ const modalEl=t.content.querySelector('.occasion-modal');if(!modalEl)return html;
+ const year=Number(window.occasionYear)||new Date().getFullYear();
+ const extra=v18RelatedExpenseTotal(e.id,year);
+ const plan=occasionPlan(e.id,year);
+ const oldCalculated=v17GiftListFor(e,year).reduce((a,g)=>a+(Number(budgetFor(g).amount)||0),0);
+ const combinedTotal=oldCalculated+extra;
+ const budgetBar=modalEl.querySelector('.budget-small');
+ if(budgetBar){
+   const spans=budgetBar.querySelectorAll(':scope > span');
+   if(spans[0])spans[0].textContent='Учтено, включая доп. расходы: '+fmt(combinedTotal);
+   if(spans[1]&&Number(plan?.budget)>0){
+     const limit=Number(plan.budget);
+     spans[1].textContent=combinedTotal>limit?'⚠ Превышение '+fmt(combinedTotal-limit):'Бюджет '+fmt(limit);
+     budgetBar.classList.toggle('over',combinedTotal>limit);
+   }
+ }
+ const giftPanel=modalEl.querySelector('.event-gifts-panel');
+ if(giftPanel){
+  giftPanel.insertAdjacentHTML('beforebegin',`<div class="v18-occasion-expenses"><span>Дополнительные расходы на материалы и подготовку: <strong>${fmt(extra)}</strong></span><button class="btn secondary" type="button" data-v18-plan-expense="${e.id}" data-v18-expense-year="${year}">+ Записать расход</button></div>`);
+  for(const giftRow of giftPanel.querySelectorAll('.event-gift-row')){
+   const gid=giftRow.querySelector('[data-gift-view-v10]')?.dataset.giftViewV10;
+   if(gid && !giftRow.querySelector('[data-v18-set-status]')){
+    const g=byId('gifts',gid);
+    giftRow.insertAdjacentHTML('beforeend',`<div class="v18-plan-gift-actions"><button type="button" data-v18-set-status="${gid}" data-v18-status="ready" ${g?.status==='ready'?'disabled':''} title="Готов">✓</button><button type="button" data-v18-set-status="${gid}" data-v18-status="given" ${g?.status==='given'?'disabled':''} title="Вручён">🎁</button></div>`);
+   }
+  }
+ }
+ const inline=modalEl.querySelector('.v16-plan-inline');if(inline && inline.children.length===1)inline.classList.add('v18-single-action');
+ const button=[...modalEl.querySelectorAll('[data-plan-edit08]')].find(Boolean);
+ if(button)button.textContent='Настроить план';
+ return t.innerHTML;
+};
+const v18OldGiftDetail=giftDetailV10;
+giftDetailV10=function(){
+ const html=v18OldGiftDetail(),g=byId('gifts',editId);if(!g||!html)return html;
+ const t=document.createElement('template');t.innerHTML=html;
+ const m=t.content.querySelector('.gift-view-modal');if(!m)return html;
+ const footer=m.querySelector('.modal-actions');
+ const ownCosts=(db.expenses||[]).filter(x=>x.giftId===g.id);
+ if(ownCosts.length&&footer){
+   footer.insertAdjacentHTML('beforebegin',`<div class="gift-view-section"><h3>Дополнительные расходы · ${fmt(ownCosts.reduce((a,x)=>a+(Number(x.amount)||0),0))}</h3>${ownCosts.map(x=>`<div class="checkrow"><div class="item-main"><strong>${escapeHtml(x.name||'Расход')}</strong><span class="muted small">${escapeHtml(x.date||'')} · ${fmt(x.amount)}</span></div></div>`).join('')}</div>`);
+ }
+ if(footer){
+  const tools=document.createElement('div');tools.className='v18-gift-detail-actions';
+  tools.innerHTML=`<button type="button" class="btn secondary" data-v18-set-status="${g.id}" data-v18-status="ready" ${g.status==='ready'?'disabled':''}>✓ Готов</button><button type="button" class="btn secondary" data-v18-set-status="${g.id}" data-v18-status="given" ${g.status==='given'?'disabled':''}>🎁 Вручён</button><button type="button" class="btn secondary" data-v18-actual="${g.id}">₽ Потрачено</button><button type="button" class="btn ghost" data-v18-expense="${g.id}">+ Расход на материалы</button>`;
+  footer.before(tools);
+ }
+ return t.innerHTML;
+};
+const v18OldFormModal=formModal;
+formModal=function(){
+ if(modal==='v18ActualGift'){
+  const g=byId('gifts',v18QuickGift);if(!g)return '';
+  const buy=g.type==='buy';
+  const linked=db.shopping.find(s=>s.giftId===g.id&&!s.materialId&&!s.partId);
+  const initial=(buy?(linked?.cost??g.actualCost):0)||'';
+  return `<div class="modal-bg" data-backdrop><div class="modal v18-actual-modal"><div class="row between"><div><div class="eyebrow">Быстрое действие</div><h2>Фактически потрачено</h2></div><button class="btn ghost" type="button" data-v18-quick-close>✕</button></div><p class="muted small">${escapeHtml(g.name)}</p><form id="v18-actual-form"><div class="formfield"><label>Сумма, ₽</label><input name="amount" type="number" min="0" step="0.01" class="field" required value="${escapeHtml(initial)}"></div><p class="muted small">${buy?'Подтверждает покупку и записывает её фактическую стоимость.':'Записывает отдельный дополнительный расход. Не повторяй суммы, уже учтённые в покупках материалов и элементов набора.'}</p><div class="modal-actions"><button class="btn secondary" type="button" data-v18-quick-close>Отмена</button><button class="btn" type="submit">Сохранить сумму</button></div></form></div></div>`;
+ }
+ return v18OldFormModal();
+};
+function v18OpenExpense({giftId='',eventId='',eventYear=0}={}){
+ const g=byId('gifts',giftId);const e=byId('events',eventId||g?.eventId);
+ v18ExpenseContext={giftId:giftId||'',eventId:e?.id||'',eventYear:Number(eventYear||g?.eventYear)||new Date().getFullYear()};
+ v18ExpenseReturn=modal==='occasion'?{kind:'occasion',eventId:editId,year:Number(window.occasionYear),page}:modal==='giftViewV10'?{kind:'gift',giftId:editId,page}:{kind:'page',page};
+ v17ExpenseEditId=null;modal='v17Expense';draw();
+}
+document.addEventListener('click',ev=>{
+ const b=ev.target.closest('[data-v18-actual],[data-v18-expense],[data-v18-plan-expense],[data-v18-set-status],[data-v18-quick-close]');if(!b)return;
+ ev.preventDefault();ev.stopImmediatePropagation();
+ if(b.matches('[data-v18-quick-close]')){modal=null;v18QuickGift=null;draw();return}
+ if(b.matches('[data-v18-plan-expense]')){v18OpenExpense({eventId:b.dataset.v18PlanExpense,eventYear:Number(b.dataset.v18ExpenseYear)});return}
+ if(b.matches('[data-v18-expense]')){v18OpenExpense({giftId:b.dataset.v18Expense});return}
+ if(b.matches('[data-v18-actual]')){v18QuickGift=b.dataset.v18Actual;modal='v18ActualGift';draw();return}
+ const g=byId('gifts',b.dataset.v18SetStatus);if(!g)return;
+ const status=b.dataset.v18Status;if(!['ready','given'].includes(status))return;
+ if(g.status==='given'&&status==='ready'){
+   if(!confirm('Подарок уже вручён. Вернуть его в статус «Готов»?'))return;
+ }
+ if(g.type==='handmade'&&status==='ready'&&db.steps.some(s=>s.giftId===g.id&&!s.done)&&!confirm('Не все этапы изготовления выполнены. Отметить подарок готовым?'))return;
+ g.status=status;draw();window.v14Toast?.(status==='ready'?'✓ Подарок готов':'🎁 Подарок вручён');
+},true);
+document.addEventListener('submit',ev=>{
+ if(ev.target.id!=='v18-actual-form')return;
+ ev.preventDefault();ev.stopImmediatePropagation();
+ const g=byId('gifts',v18QuickGift),amount=Number(new FormData(ev.target).get('amount'));
+ if(!g||!Number.isFinite(amount)||amount<0)return;
+ if(g.type==='buy'){
+   let row=db.shopping.find(s=>s.giftId===g.id&&!s.materialId&&!s.partId);
+   if(row){row.cost=amount;row.done=true;row.purchasedAt=v18NowDay()}
+   g.actualCost=amount;g.purchased=true;g.purchasedAt=v18NowDay();
+ }else{
+   // Edit a dedicated quick-cost record rather than creating one on each save.
+   let x=db.expenses.find(x=>x.quickCostGiftId===g.id);
+   if(!x){x={id:id(),quickCostGiftId:g.id,giftId:g.id};db.expenses.push(x)}
+   Object.assign(x,{name:'Дополнительные расходы: '+g.name,amount,date:v18NowDay(),category:g.type==='handmade'?'handmade':g.type==='bundle'?'bundle':'other',eventId:g.eventId||'',eventYear:Number(g.eventYear)||new Date().getFullYear()});
+ }
+ v18QuickGift=null;modal=null;draw();window.v14Toast?.('✓ Фактические расходы сохранены');
+},true);
+
+
+// Existing-material expense allocation: attach a purchase to an occasion without cloning it.
+const gpMaterialPlanYear=()=>Number(window.occasionYear)||new Date().getFullYear();
+const gpMaterialEventName=(eventId,year)=>{
+  const e=byId('events',eventId);
+  return e ? `${e.name}${year?' · '+year:''}` : '';
+};
+const gpMaterialSourceRecords=()=>{
+  const shopping=(db.shopping||[])
+    .filter(s=>s.done && s.materialId)
+    .map(s=>({source:'shopping',id:String(s.id),record:s,
+      name:s.name||byId('materials',s.materialId)?.name||'Покупка материала',
+      amount:Number(s.cost)||0,date:s.purchasedAt||s.date||'',
+      giftId:s.giftId||'',eventId:s.eventId||'',eventYear:Number(s.eventYear)||0}));
+  const manual=(db.expenses||[])
+    .filter(x=>x.category==='materials')
+    .map(x=>({source:'expense',id:String(x.id),record:x,
+      name:x.name||'Материалы',amount:Number(x.amount)||0,date:x.date||'',
+      giftId:x.giftId||'',eventId:x.eventId||'',eventYear:Number(x.eventYear)||0}));
+  return [...shopping,...manual].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+};
+const gpMaterialExpenseOwnedByGift=(item)=>{
+  const gift=item.giftId?byId('gifts',item.giftId):null;
+  return gift?.eventId||'';
+};
+const gpMaterialIsLinked=(item,eventId,year)=>
+  item.eventId===eventId && Number(item.eventYear)===Number(year);
+const gpMaterialExpenseEligible=(item,eventId,year)=>{
+  const giftEvent=gpMaterialExpenseOwnedByGift(item);
+  // A material cost already belonging to a gift in another occasion cannot be reassigned independently.
+  if(giftEvent && giftEvent!==eventId)return false;
+  return !gpMaterialIsLinked(item,eventId,year);
+};
+const gpMaterialLinkedRecords=(eventId,year)=>gpMaterialSourceRecords()
+  .filter(item=>gpMaterialIsLinked(item,eventId,year));
+const gpMaterialExtraPurchases=(eventId,year)=>gpMaterialLinkedRecords(eventId,year)
+  .filter(item=>item.source==='shopping')
+  // A purchase already included in budgetFor(gift) must not be added a second time.
+  .filter(item=>!item.giftId || !v17GiftListFor(byId('events',eventId),Number(year)).some(g=>g.id===item.giftId))
+  .reduce((sum,item)=>sum+item.amount,0);
+const gpMaterialPriorExpenseTotal=v18RelatedExpenseTotal;
+v18RelatedExpenseTotal=function(eventId,year){
+  return gpMaterialPriorExpenseTotal(eventId,year) + gpMaterialExtraPurchases(eventId,year);
+};
+let gpMaterialAttachContext=null;
+const gpMaterialPrevOccasion=occasionHtml;
+occasionHtml=function(){
+  const html=gpMaterialPrevOccasion();
+  const e=byId('events',editId);
+  if(!e || !html)return html;
+  const year=gpMaterialPlanYear(),t=document.createElement('template');t.innerHTML=html;
+  const row=t.content.querySelector('.v18-occasion-expenses');
+  if(!row)return html;
+  const button=document.createElement('button');
+  button.type='button';button.className='btn ghost';
+  button.textContent='Привязать существующий расход';
+  button.dataset.gpMaterialAttach=e.id;
+  button.dataset.gpMaterialYear=String(year);
+  row.append(button);
+  const existing=gpMaterialLinkedRecords(e.id,year);
+  if(existing.length){
+    const list=document.createElement('div');list.className='gp-material-linked';
+    list.innerHTML=`<div class="muted small">Уже привязанные материалы (суммы учтены один раз)</div>${existing.map(x=>`<div class="gp-material-linked-item"><span>${escapeHtml(x.name)} · ${fmt(x.amount)}${x.date?' · '+escapeHtml(x.date):''}</span>${x.giftId?'':`<button class="linklike" type="button" data-gp-material-unlink="${escapeHtml(x.source+':'+x.id)}" data-gp-material-event="${escapeHtml(e.id)}" data-gp-material-year="${year}">Отвязать</button>`}</div>`).join('')}`;
+    row.after(list);
+  }
+  return t.innerHTML;
+};
+const gpMaterialForm=()=>{
+  const event=byId('events',gpMaterialAttachContext?.eventId),year=gpMaterialAttachContext?.year;
+  if(!event)return '';
+  const items=gpMaterialSourceRecords().filter(x=>gpMaterialExpenseEligible(x,event.id,year));
+  const label=x=>{
+    const eventName=x.eventId?gpMaterialEventName(x.eventId,x.eventYear):'';
+    const giftName=x.giftId?byId('gifts',x.giftId)?.name:'';
+    return `<label class="gp-material-option"><input type="radio" name="item" value="${escapeHtml(x.source+':'+x.id)}" required><span><strong>${escapeHtml(x.name)}</strong><small>${fmt(x.amount)}${x.date?' · куплено '+escapeHtml(x.date):''} · ${x.source==='shopping'?'Покупки':'Реестр расходов'}${eventName?' · сейчас: '+escapeHtml(eventName):''}${giftName?' · подарок: '+escapeHtml(giftName):''}</small></span></label>`;
+  };
+  return `<div class="modal-bg" data-backdrop><div class="modal gp-material-modal"><div class="row between"><div><h2>Привязать существующий расход</h2><p class="muted small">${escapeHtml(event.name)} · ${year}</p></div><button type="button" class="btn ghost" data-gp-material-cancel>✕</button></div><p class="muted small">Выбери уже внесённую покупку материала или расход. Сумма, дата и домашний запас не изменятся. Покупка останется одной записью.</p>${items.length?`<form id="gp-material-attach-form"><div class="gp-material-options">${items.map(label).join('')}</div><p class="muted small">Если расход связан с другим праздником, он будет перенесён в этот план, а не скопирован. Материалы, уже закреплённые за подарком другого праздника, здесь не предлагаются.</p><div class="modal-actions"><button class="btn secondary" type="button" data-gp-material-cancel>Отмена</button><button class="btn" type="submit">Привязать к празднику</button></div></form>`:`<div class="empty">Нет свободных расходов на материалы. Отметь материал купленным в «Покупках» или внеси расход в финансовом реестре.</div><div class="modal-actions"><button class="btn secondary" type="button" data-gp-material-cancel>Закрыть</button></div>`}</div></div>`;
+};
+const gpMaterialPrevFormModal=formModal;
+formModal=function(){
+  if(modal==='gpMaterialAttach')return gpMaterialForm();
+  return gpMaterialPrevFormModal();
+};
+const gpMaterialReturn=()=>{
+  if(gpMaterialAttachContext){
+    editId=gpMaterialAttachContext.eventId;
+    window.occasionYear=gpMaterialAttachContext.year;
+  }
+  modal='occasion';gpMaterialAttachContext=null;draw();
+};
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-gp-material-attach],[data-gp-material-unlink],[data-gp-material-cancel]');
+  if(!b)return;
+  ev.preventDefault();ev.stopImmediatePropagation();
+  if(b.hasAttribute('data-gp-material-attach')){
+    gpMaterialAttachContext={eventId:b.dataset.gpMaterialAttach,year:Number(b.dataset.gpMaterialYear)};
+    modal='gpMaterialAttach';draw();return;
+  }
+  if(b.hasAttribute('data-gp-material-cancel')){gpMaterialReturn();return;}
+  if(b.hasAttribute('data-gp-material-unlink')){
+    const [source,...pieces]=b.dataset.gpMaterialUnlink.split(':'),idValue=pieces.join(':');
+    const rec=source==='shopping'?byId('shopping',idValue):(db.expenses||[]).find(x=>x.id===idValue);
+    if(!rec||rec.eventId!==b.dataset.gpMaterialEvent||Number(rec.eventYear)!==Number(b.dataset.gpMaterialYear))return;
+    rec.eventId='';delete rec.eventYear;
+    draw();window.v14Toast?.('✓ Расход отвязан; сумма и покупка сохранены.');return;
+  }
+},true);
+document.addEventListener('submit',ev=>{
+  if(ev.target.id!=='gp-material-attach-form')return;
+  ev.preventDefault();ev.stopImmediatePropagation();
+  const context=gpMaterialAttachContext;
+  if(!context||!byId('events',context.eventId))return;
+  const val=String(new FormData(ev.target).get('item')||'');
+  const [source,...parts]=val.split(':'),recordId=parts.join(':');
+  const item=gpMaterialSourceRecords().find(x=>x.source===source&&x.id===recordId);
+  if(!item||!gpMaterialExpenseEligible(item,context.eventId,context.year))return;
+  if(item.eventId && !gpMaterialIsLinked(item,context.eventId,context.year)){
+    if(!confirm('Расход уже привязан к другому празднику. Перенести его в этот план без дублирования суммы?'))return;
+  }
+  item.record.eventId=context.eventId;
+  item.record.eventYear=context.year;
+  gpMaterialReturn();window.v14Toast?.('✓ Существующий расход привязан без повторной покупки.');
+},true);
+
 // Consistent naming and no more than a single category badge in any profile header.
 draw();
 })();
@@ -2849,5 +3159,43 @@ body.dark .gp-handmade-status.is-ready{background:#234033;border-color:#35664f}
 .gp-import-stage input{margin-top:3px}
 .gp-import-modal h2{margin:3px 0 14px}
 @media(max-width:600px){.gp-handmade-status{align-items:stretch}.gp-handmade-status>.btn{width:100%}.gp-import-stage-list{max-height:35vh}}
+</style>
+
+<style id="gp-nov17-style">
+/* Project UI refinements, no gradients */
+.occasion-modal .v16-plan-inline{display:grid!important;grid-template-columns:minmax(0,1fr)!important;width:100%}
+.occasion-modal .v16-plan-inline.v18-single-action{display:grid!important;grid-template-columns:minmax(0,1fr)!important;width:100%}
+.occasion-modal .v16-plan-inline.v18-single-action>.btn{width:100%!important;max-width:none!important;min-height:48px}
+.v18-occasion-expenses{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:14px 0 18px;padding:15px 16px;border:1px solid var(--line);border-radius:16px;background:var(--panel2)}
+.v18-occasion-expenses>span{font-size:14px;color:var(--muted)}
+.v18-occasion-expenses strong{color:var(--text)}
+.v18-quick{position:relative;display:inline-flex;align-items:center;z-index:2}
+.v18-quick>summary{list-style:none;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid var(--line);border-radius:12px;padding:10px 16px;font-weight:750;color:var(--accent);background:var(--panel);white-space:nowrap}
+.v18-quick>summary::-webkit-details-marker{display:none}
+.v18-quick[open]>.v18-quick-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;position:absolute;top:calc(100% + 6px);left:0;min-width:265px;max-width:min(90vw,320px);padding:9px;background:var(--panel);border:1px solid var(--line);border-radius:15px;box-shadow:0 12px 24px #2e224428;z-index:8}
+.v18-action{border:0;background:var(--panel2);color:var(--text);border-radius:10px;padding:10px 8px;text-align:center;font-weight:650;white-space:normal;cursor:pointer}
+.v18-action:disabled{opacity:.4;cursor:default}
+.v18-plan-gift-actions{display:flex;gap:6px;flex-shrink:0;margin-left:auto}
+.v18-plan-gift-actions>button{border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:5px 9px;cursor:pointer;color:var(--accent);font-size:17px}
+.v18-plan-gift-actions>button:disabled{opacity:.4}
+.v18-gift-detail-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:18px;justify-content:flex-start}
+.v18-actual-modal{width:min(510px,96vw)}
+@media(max-width:700px){.v18-occasion-expenses{align-items:stretch;flex-direction:column}.v18-occasion-expenses .btn{width:100%}.v18-quick[open]>.v18-quick-actions{left:auto;right:0}.v18-gift-detail-actions .btn{flex:1 1 calc(50% - 10px)}.v18-plan-gift-actions>button{padding:6px}}
+</style>
+
+<style id="gp-material-link-style">
+.gp-material-modal{width:min(720px,96vw)}
+.gp-material-options{display:flex;flex-direction:column;gap:9px;max-height:min(49dvh,420px);overflow:auto;margin:15px 0}
+.gp-material-option{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:13px;cursor:pointer}
+.gp-material-option:has(input:checked){border-color:var(--accent);background:var(--accent2)}
+.gp-material-option input{margin-top:5px;flex:none}
+.gp-material-option span{display:flex;flex-direction:column;gap:5px;min-width:0}
+.gp-material-option strong{font-size:14px;overflow-wrap:anywhere}
+.gp-material-option small{font-size:12px;line-height:1.5;color:var(--muted)}
+.gp-material-linked{border:1px solid var(--line);border-radius:13px;background:var(--panel);padding:12px 14px;margin:8px 0 18px}
+.gp-material-linked-item{display:flex;align-items:center;justify-content:space-between;gap:14px;border-top:1px solid var(--line);padding:10px 0;font-size:13px}
+.gp-material-linked-item:first-of-type{margin-top:8px}
+.gp-material-linked-item span{overflow-wrap:anywhere}
+@media(max-width:700px){.v18-occasion-expenses .btn{width:100%}.gp-material-modal{padding:16px}.gp-material-linked-item{align-items:flex-start}}
 </style>
 <script type="module" src="./firebase-sync.js"></script></body></html>

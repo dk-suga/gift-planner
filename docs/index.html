@@ -439,7 +439,10 @@ body.dark .v17-summary-card.lavender{background:#392e49}body.dark .v17-summary-c
     margin: auto 0;
   }
 }
-</style></head><body data-cloud-status="loading"><div id="root"></div><div id="cloud-gate" class="gp-gate" role="dialog" aria-modal="true" aria-labelledby="gp-gate-title"><div class="gp-gate-card"><div class="gp-gate-icon">🎁</div><h1 id="gp-gate-title">Gift Planner</h1><p id="gp-gate-description">Подключаю личное пространство…</p><div id="gp-login-fields" hidden><label>Email<input type="email" id="gp-login-email" autocomplete="username" placeholder="Твой email"></label><label>Пароль<input type="password" id="gp-login-pass" autocomplete="current-password" placeholder="Пароль входа в приложение"></label><button id="gp-login-btn" type="button">Войти</button></div><div class="gp-gate-actions"><button id="gp-retry" type="button" hidden>Повторить</button><button id="gp-demo" type="button" hidden aria-hidden="true">Демо</button></div><p id="gp-gate-error" role="alert" hidden></p></div></div><div id="gp-sync-bar" class="gp-sync-bar" role="status" aria-live="polite" hidden></div><script>
+</style><style id="gp-expense-breakdown-repair-css">
+.gp-event-direct-note{display:block;font-size:11px;line-height:1.4;color:var(--muted);font-weight:400;margin-top:4px}
+</style>
+</head><body data-cloud-status="loading"><div id="root"></div><div id="cloud-gate" class="gp-gate" role="dialog" aria-modal="true" aria-labelledby="gp-gate-title"><div class="gp-gate-card"><div class="gp-gate-icon">🎁</div><h1 id="gp-gate-title">Gift Planner</h1><p id="gp-gate-description">Подключаю личное пространство…</p><div id="gp-login-fields" hidden><label>Email<input type="email" id="gp-login-email" autocomplete="username" placeholder="Твой email"></label><label>Пароль<input type="password" id="gp-login-pass" autocomplete="current-password" placeholder="Пароль входа в приложение"></label><button id="gp-login-btn" type="button">Войти</button></div><div class="gp-gate-actions"><button id="gp-retry" type="button" hidden>Повторить</button><button id="gp-demo" type="button" hidden aria-hidden="true">Демо</button></div><p id="gp-gate-error" role="alert" hidden></p></div></div><div id="gp-sync-bar" class="gp-sync-bar" role="status" aria-live="polite" hidden></div><script>
 const KEY='gift-planner-lavender-v1', NAV=[['home','⌂','Главная'],['calendar','▦','Календарь'],['people','👥','Люди'],['gifts','🎁','Подарки'],['workshop','🧶','Мастерская'],['shopping','🛒','Покупки'],['settings','⚙','Настройки']];
 const NAV_ICONS={home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/><path d="m9 16 2 2 4-4"/>',people:'<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 11a3 3 0 1 0-1-6M18 14a5 5 0 0 1 3 5v1"/>',gifts:'<rect x="3" y="10" width="18" height="11" rx="2"/><path d="M2 7h20v4H2zM12 7v14M12 7c-5-1-7-3-6-5 2-3 6 1 6 5zm0 0c5-1 7-3 6-5-2-3-6 1-6 5z"/>',workshop:'<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8 8l13 12M8 16 21 4"/>',shopping:'<path d="M3 10h18l-2 11H5L3 10ZM8 10l4-7 4 7M9 14v3m6-3v3"/>',settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>',more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'};
 const navIcon=k=>`<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${NAV_ICONS[k]||NAV_ICONS.more}</svg>`;
@@ -2316,9 +2319,48 @@ const v17Ledger=()=>{
  }
  return result;
 };
+// One canonical ledger for the annual KPIs, reconciliations and holiday breakdown.
+// Legacy records can be linked to an occasion *after* being purchased. The plan
+// panel reads db.shopping/db.expenses directly; older reports did not always
+// refresh those links in the same way. Reconcile the original purchase by ID,
+// never by copying its monetary amount into a second expense record.
+const gpFullLedger=()=>{
+ const records=new Map(v17Ledger().map(row=>[row.id,row]));
+ const hasPrice=value=>value!==null && value!==undefined && String(value).trim()!=='';
+ for(const purchase of db.shopping||[]){
+   if(!purchase.eventId || purchase.giftId || purchase.partId)continue;
+   const key='shopping:'+purchase.id, original=records.get(key)||{};
+   records.set(key,{...original,id:key,origin:'shopping',label:purchase.name||byId('materials',purchase.materialId)?.name||'Покупка',
+     amount:v17Money(purchase.cost),confirmed:!!purchase.done,hasActual:!!purchase.done&&hasPrice(purchase.cost),
+     category:purchase.materialId?'materials':'other',eventId:purchase.eventId,planYear:v17Year(purchase.eventYear)||null,
+     giftId:'',recipientIds:[],date:purchase.purchasedAt||purchase.date||'',
+     year:v17Year(String(purchase.purchasedAt||purchase.date||'').slice(0,4))||v17CurrentYear,
+     gpDirectPlanPurchase:true});
+ }
+ for(const expense of db.expenses||[]){
+   if(!expense.eventId || expense.giftId)continue;
+   const key='extra:'+expense.id, original=records.get(key)||{};
+   records.set(key,{...original,id:key,origin:'extra',label:expense.name||'Расход',
+     amount:v17Money(expense.amount),confirmed:true,hasActual:hasPrice(expense.amount),
+     category:expense.category||'other',eventId:expense.eventId,planYear:v17Year(expense.eventYear)||null,
+     giftId:'',recipientIds:expense.personId?[expense.personId]:[],date:expense.date||'',
+     year:v17Year(String(expense.date||'').slice(0,4))||v17CurrentYear,
+     gpDirectPlanPurchase:true});
+ }
+ return [...records.values()];
+};
+const gpFullHandoverYear=(row)=>{
+ if(row.gpDirectPlanPurchase&&row.eventId){
+   const occurrence=v17Year(row.planYear),event=byId('events',row.eventId);
+   const plan=(db.occasionPlans||[]).find(p=>p.eventId===row.eventId&&Number(p.year)===occurrence)
+     ||(db.occasionPlans||[]).find(p=>Number(p.year)===occurrence&&v17EventKey(byId('events',p.eventId))===v17EventKey(event));
+   if(plan)return gpHandoverPlanYear(plan);
+ }
+ return gpHandoverLedgerYear(row);
+};
 const v17StatsData=(year)=>{
  const gifts=db.gifts.filter(g=>!g.archived&&g.inventoryState!=='stock'&&g.status!=='idea'&&gpHandoverGiftYear(g)===year),
-  ledger=v17Ledger().filter(x=>x.year===year),actual=ledger.filter(x=>x.confirmed&&x.hasActual),
+  ledger=gpFullLedger().filter(x=>x.year===year),actual=ledger.filter(x=>x.confirmed&&x.hasActual),
   uncertain=ledger.filter(x=>x.confirmed&&!x.hasActual),pending=ledger.filter(x=>!x.confirmed);
  const sum=arr=>v17Money(arr.reduce((acc,x)=>acc+v17Money(x.amount),0));
  // An annual plan is assigned to the year when its gifts are handed over.
@@ -2344,7 +2386,7 @@ const v17StatsData=(year)=>{
  const budget=v17Money(occasionBudget+separateGiftBudget);
  // Link expenses by their gift or event occurrence, then assign to the year of handover.
  // The chronological cashflow remains grouped by the purchase date in `ledger` above.
- const budgetLedger=v17Ledger().filter(x=>gpHandoverLedgerYear(x)===Number(year));
+ const budgetLedger=gpFullLedger().filter(x=>gpFullHandoverYear(x)===Number(year));
  const budgetConfirmed=budgetLedger.filter(x=>x.confirmed&&x.hasActual);
  const budgetSpent=sum(budgetConfirmed);
  const budgetIds=new Set(budgetConfirmed.map(x=>x.id)),cashIds=new Set(actual.map(x=>x.id));
@@ -2393,7 +2435,7 @@ let gpReconcileDateRowId='';
 const gpReconcileOldFormModal=formModal;
 formModal=function(){
  if(modal!=='gpReconcileDate')return gpReconcileOldFormModal();
- const x=v17Ledger().find(row=>row.id===gpReconcileDateRowId);
+ const x=gpFullLedger().find(row=>row.id===gpReconcileDateRowId);
  if(!x)return gpReconcileOldFormModal();
  return `<div class="modal-bg" data-backdrop><div class="modal gp-reconcile-modal"><div class="row between"><h2>Дата оплаты</h2><button type="button" class="btn ghost" data-gp-reconcile-close>✕</button></div><p class="muted">${escapeHtml(x.label)} · ${fmt(x.amount)}</p><form id="gp-reconcile-date-form"><label class="formfield">Когда покупка была оплачена?<input class="field" type="date" name="paidDate" value="${escapeHtml(gpReconcilePaidDate(x)||gpPurchaseLocalDate())}" required max="${escapeHtml(gpPurchaseLocalDate())}"></label><p class="muted small">Меняется только дата оплаты этой записи. Сумма, статус и привязка к празднику останутся прежними.</p><div class="modal-actions"><button type="button" class="btn secondary" data-gp-reconcile-close>Отмена</button><button type="submit" class="btn">Сохранить дату</button></div></form></div></div>`;
 };
@@ -2431,7 +2473,7 @@ window.statisticsV12=function(){
  // All breakdowns for holidays use exactly the same confirmed entries as the
  // "Фактически потрачено" KPI (year of handing over). Purchases may have been
  // paid in another calendar year; they must not disappear from the holiday chart.
- const planYearLedger=v17Ledger().filter(x=>x.confirmed&&x.hasActual&&gpHandoverLedgerYear(x)===year);
+ const planYearLedger=gpFullLedger().filter(x=>x.confirmed&&x.hasActual&&gpFullHandoverYear(x)===year);
  const eventIdForRow=x=>x.eventId||byId('gifts',x.giftId)?.eventId||'';
  const filteredPlanLedger=planYearLedger.filter(x=>(v17FinancePerson==='all'||x.recipientIds.includes(v17FinancePerson))&&(v17FinanceEvent==='all'||eventIdForRow(x)===v17FinanceEvent));
  // Month-by-month cashflow keeps the actual payment calendar year.
@@ -2439,7 +2481,7 @@ window.statisticsV12=function(){
  const sum=arr=>v17Money(arr.reduce((a,x)=>a+x.amount,0));
  const byType=Object.entries(v17CategoryLabel).map(([key,name])=>({key,name,records:filteredPlanLedger.filter(x=>x.category===key)})).filter(x=>x.records.length);
  const byMonth=Array.from({length:12},(_,i)=>({month:i,name:new Date(year,i,1).toLocaleDateString('ru-RU',{month:'short'}),amount:sum(filterLedger.filter(x=>{const dt=x.date||'';return dt.startsWith(String(year)+'-'+String(i+1).padStart(2,'0'))}))}));
- const byEvent=new Map();for(const x of filteredPlanLedger){const key=eventIdForRow(x)||'none',e=byId('events',key);if(!byEvent.has(key))byEvent.set(key,{name:e?.name||'Без события',total:0,count:0});const a=byEvent.get(key);a.total+=x.amount;a.count++}
+ const byEvent=new Map();for(const x of filteredPlanLedger){const key=eventIdForRow(x)||'none',e=byId('events',key);if(!byEvent.has(key))byEvent.set(key,{name:e?.name||'Без события',total:0,direct:0,count:0});const a=byEvent.get(key);a.total+=x.amount;if(x.gpDirectPlanPurchase)a.direct+=x.amount;a.count++}
  const byPeople=new Map();for(const x of filteredPlanLedger){const r=x.recipientIds.length?x.recipientIds:['unassigned'],share=x.amount/r.length;for(const pid of r){const name=byId('people',pid)?.name||'Без получателя';const old=byPeople.get(pid)||{name,total:0};old.total+=share;byPeople.set(pid,old)}}
  const records=filteredPlanLedger.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
  const statTiles=`<div class="v17-kpi-grid">${v17SummaryCard('Бюджет на '+year+' год',fmt(stats.budget),`По дате вручения: праздники ${fmt(stats.occasionBudget)} · отдельные подарки ${fmt(stats.separateGiftBudget)}`,'lavender')}${v17SummaryCard('Фактически потрачено',fmt(stats.budgetSpent),'Подтверждённые расходы, связанные с подарками и планами года вручения','sage')}${v17SummaryCard('Осталось в бюджете',fmt(stats.available),`Подтверждено: ${fmt(stats.budgetSpent)} · включая покупки прошлых лет`,'blue')}${v17SummaryCard('Осталось купить',fmt(stats.pendingTotal),'Планируемые покупки, не вошедшие в фактические расходы','sand')}${v17SummaryCard('Куплено без точной цены',fmt(stats.estimate),`${stats.uncertain.length} позиций (не входят в факт)`,'neutral')}${v17SummaryCard('Вручено подарков',`${stats.delivered} из ${stats.gifts.length}`,'В году вручения','neutral')}</div>`;
@@ -2465,7 +2507,7 @@ window.statisticsV12=function(){
  const panels=`<div class="v17-finance-body">
  <section class="v17-finance-section"><h3>Расходы по типам</h3>${byType.length?byType.map(x=>`<div class="v17-chart-row"><span>${x.name}</span>${v17Bar(sum(x.records),Math.max(1,...byType.map(t=>sum(t.records))))}<strong>${fmt(sum(x.records))}</strong></div>`).join(''):'<p class="muted">Подтверждённых расходов за выбранный год пока нет.</p>'}</section>
  <section class="v17-finance-section"><h3>Расходы по месяцам оплаты</h3>${filterLedger.filter(x=>!x.date).length?`<p class="muted small">${filterLedger.filter(x=>!x.date).length} покупок без даты включены в годовой итог, но не в помесячные столбцы.</p>`:''}<div class="v17-month-chart">${byMonth.map(m=>`<div class="v17-month"><div class="v17-month-bar" title="${escapeHtml(m.name)}: ${fmt(m.amount)}"><i style="height:${m.amount?Math.max(5,Math.round(m.amount/Math.max(1,...byMonth.map(x=>x.amount))*100)):0}%"></i></div><small>${m.name}</small></div>`).join('')}</div></section>
- <section class="v17-finance-section"><h3>По праздникам</h3><p class="muted small">Показывает все подтверждённые расходы по году вручения — включая материалы и покупки, привязанные прямо к плану. Дата оплаты может относиться к другому году.</p>${eventRows.length?eventRows.map(x=>`<div class="v17-chart-row"><span>${escapeHtml(x.name)}</span>${v17Bar(x.total,max)}<strong>${fmt(x.total)}</strong></div>`).join(''):'<p class="muted">Трат по праздникам пока нет.</p>'}</section>
+ <section class="v17-finance-section"><h3>По праздникам</h3><p class="muted small">Показывает все подтверждённые расходы по году вручения — включая материалы и покупки, привязанные прямо к плану. Дата оплаты может относиться к другому году.</p>${eventRows.length?eventRows.map(x=>`<div class="v17-chart-row"><span>${escapeHtml(x.name)}${x.direct?`<small class="gp-event-direct-note">В том числе привязанные к плану покупки: ${fmt(x.direct)}</small>`:''}</span>${v17Bar(x.total,max)}<strong>${fmt(x.total)}</strong></div>`).join(''):'<p class="muted">Трат по праздникам пока нет.</p>'}</section>
  <section class="v17-finance-section"><h3>По людям (распределение)</h3><p class="muted small">Если один подарок предназначен нескольким людям, стоимость делится между ними поровну только для аналитики. В общем итоге она учитывается один раз.</p>${personRows.length?personRows.map(x=>`<div class="v17-chart-row"><span>${escapeHtml(x.name)}</span>${v17Bar(x.total,Math.max(1,...personRows.map(t=>t.total)))}<strong>${fmt(x.total)}</strong></div>`).join(''):'<p class="muted">Пока нет связанных расходов.</p>'}</section>
  <section class="v17-finance-section v20-wide-stats"><h3>Подарки и планы за год</h3><div class="v17-status-grid">${statuses.map(s=>`<div><strong>${s.count}</strong><small>${escapeHtml(s.name)}</small></div>`).join('')}<div><strong>${completedPlans}/${plans.length}</strong><small>Планы завершены</small></div><div><strong>${db.people.length}</strong><small>Людей в картотеке</small></div></div></section>
  <section class="v17-finance-section v17-ledger"><div class="row between"><h3>Реестр подтверждённых расходов</h3><button class="btn secondary" data-v17-add-expense>+ Расход</button></div><p class="muted small">Показывает источник каждой суммы; бюджеты не подменяют реальные расходы. Дополнительные траты можно записать вручную.</p><div class="v17-table-wrap"><table><thead><tr><th>Дата</th><th>Расход</th><th>Событие</th><th>Сумма</th></tr></thead><tbody>${sourceRows||'<tr><td colspan="4">Пока нет подтверждённых расходов</td></tr>'}</tbody></table></div></section>
@@ -3182,6 +3224,58 @@ document.addEventListener('click',ev=>{
  v17SelectedFinanceYear=Number(b.dataset.gpStatsJump);
  draw();
 },true);
+
+// One source of confirmed spending for both holiday statistics and its plan card.
+// The old plan calculation used budgetFor(g), which differs from the ledger used
+// by the chart (e.g. an extra expense linked to a gift isn't in budgetFor(g)).
+const gpPlanConfirmedRows = (event, occasionYear) => {
+  if (!event) return [];
+  const plan = occasionPlan(event.id, occasionYear);
+  const handingYear = plan
+    ? gpHandoverPlanYear(plan)
+    : v17Year(String(dateAtYear(event, occasionYear) || '').slice(0, 4)) || occasionYear;
+  return gpFullLedger().filter(row => {
+    if (!row.confirmed || !row.hasActual || gpFullHandoverYear(row) !== handingYear) return false;
+    const gift = row.giftId ? byId('gifts', row.giftId) : null;
+    const linkedEventId = row.eventId || gift?.eventId || '';
+    if (linkedEventId !== event.id) return false;
+    // Keep adjacent annual occurrences separate even if both are handed over
+    // in the same calendar year. Missing occurrence IDs in legacy data use
+    // the same year-by-handover fallback as the original finance ledger.
+    const linkedOccurrence = v17Year(row.planYear) || (gift ? v17GiftYear(gift) : null);
+    return !linkedOccurrence || linkedOccurrence === Number(occasionYear);
+  });
+};
+const gpOldOccasionBeforeTotalFix = occasionHtml;
+occasionHtml = function () {
+  const html = gpOldOccasionBeforeTotalFix();
+  const event = byId('events', editId);
+  if (!event || !html) return html;
+  const occasionYear = Number(window.occasionYear) || v17CurrentYear;
+  const plan = occasionPlan(event.id, occasionYear);
+  if (!plan) return html;
+
+  const rows = gpPlanConfirmedRows(event, occasionYear);
+  const spent = v17Money(rows.reduce((sum, row) => sum + v17Money(row.amount), 0));
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  const budgetRow = template.content.querySelector('.occasion-modal .budget-small');
+  if (!budgetRow) return html;
+  const spans = budgetRow.querySelectorAll(':scope > span');
+  if (!spans.length) return html;
+  spans[0].textContent = 'Фактически потрачено: ' + fmt(spent);
+
+  const rawBudget = plan.budget;
+  const budgetSpecified = rawBudget !== null && rawBudget !== undefined && String(rawBudget).trim() !== '';
+  const limit = v17Money(rawBudget);
+  if (spans[1]) {
+    spans[1].textContent = budgetSpecified
+      ? (spent > limit ? '⚠ Превышение ' + fmt(spent - limit) + ' · бюджет ' + fmt(limit) : 'Бюджет ' + fmt(limit))
+      : 'Бюджет не задан';
+  }
+  budgetRow.classList.toggle('over', budgetSpecified && spent > limit);
+  return template.innerHTML;
+};
 
 // Consistent naming and no more than a single category badge in any profile header.
 draw();

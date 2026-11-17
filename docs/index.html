@@ -2343,10 +2343,27 @@ const v17StatsData=(year)=>{
  // Link expenses by their gift or event occurrence, then assign to the year of handover.
  // The chronological cashflow remains grouped by the purchase date in `ledger` above.
  const budgetLedger=v17Ledger().filter(x=>gpHandoverLedgerYear(x)===Number(year));
- const budgetSpent=sum(budgetLedger.filter(x=>x.confirmed&&x.hasActual));
+ const budgetConfirmed=budgetLedger.filter(x=>x.confirmed&&x.hasActual);
+ const budgetSpent=sum(budgetConfirmed);
+ const budgetIds=new Set(budgetConfirmed.map(x=>x.id)),cashIds=new Set(actual.map(x=>x.id));
+ const countedOnlyInBudget=budgetConfirmed.filter(x=>!cashIds.has(x.id));
+ const countedOnlyInCash=actual.filter(x=>!budgetIds.has(x.id));
+ const matchingItems=actual.filter(x=>budgetIds.has(x.id));
  const planPending=sum(budgetLedger.filter(x=>!x.confirmed));
- return {year,gifts,ledger,actual,uncertain,pending,budget,occasionBudget:v17Money(occasionBudget),separateGiftBudget:v17Money(separateGiftBudget),budgetSpent,spent:sum(actual),pendingTotal:planPending,estimate:sum(uncertain),available:v17Money(budget-budgetSpent),delivered:gifts.filter(g=>g.status==='given').length};
+ return {year,gifts,ledger,actual,uncertain,pending,budget,occasionBudget:v17Money(occasionBudget),separateGiftBudget:v17Money(separateGiftBudget),budgetSpent,spent:sum(actual),pendingTotal:planPending,estimate:sum(uncertain),available:v17Money(budget-budgetSpent),delivered:gifts.filter(g=>g.status==='given').length,
+   reconciliation:{onlyBudget:countedOnlyInBudget,onlyCash:countedOnlyInCash,matching:matchingItems,
+     budgetOnlyTotal:sum(countedOnlyInBudget),cashOnlyTotal:sum(countedOnlyInCash)}};
 };
+// Diagnose ambiguous historical purchase dates without silently assigning a date.
+const gpReconcilePaidDate=(row)=>{
+ if(row.origin==='shopping')return byId('shopping',String(row.id).slice(9))?.purchasedAt||'';
+ if(row.origin==='gift')return byId('gifts',String(row.id).slice(5))?.purchasedAt||'';
+ if(row.origin==='bundle')return byId('bundleItems',String(row.id).slice(5))?.purchasedAt||'';
+ if(row.origin==='handmade')return byId('gifts',String(row.id).slice(15))?.purchasedAt||'';
+ if(row.origin==='extra')return byId('expenses',String(row.id).slice(6))?.date||'';
+ return '';
+};
+const gpReconcileEditableDate=(row)=>['shopping','gift','bundle','handmade'].includes(row.origin) && !gpReconcilePaidDate(row);
 const v17Bar=(value,max)=>`<div class="v17-bar"><i style="width:${Math.round(max?value/max*100:0)}%"></i></div>`;
 const v17SummaryCard=(title,value,hint,tone)=>`<div class="v17-summary-card ${tone}"><span>${title}</span><strong>${value}</strong><small>${hint}</small></div>`;
 let v17SelectedFinanceYear=null,v17FinancePerson='all',v17FinanceEvent='all',v17FinanceTab='overview',v17ExpenseEditId=null;
@@ -2370,6 +2387,38 @@ const v17ExpenseForm=()=>{
  <label>Заметка<textarea class="field" name="note">${escapeHtml(e.note||'')}</textarea></label>`;
  return `<div class="modal-bg" data-backdrop><div class="modal v17-modal"><div class="row between"><h2>${v17ExpenseEditId?'Изменить расход':'Добавить расход'}</h2><button class="btn ghost" type="button" data-close aria-label="Закрыть">✕</button></div><p class="muted small">Отдельный подтверждённый расход: материалы, упаковка или доставка. Не записывай повторно стоимость уже отмеченной покупки.</p><form id="v17-expense-form"><div class="v17-form-grid">${inputs}</div><div class="modal-actions"><button type="button" class="btn secondary" data-close>Отмена</button><button type="submit" class="btn">Сохранить</button></div></form></div></div>`;
 };
+let gpReconcileDateRowId='';
+const gpReconcileOldFormModal=formModal;
+formModal=function(){
+ if(modal!=='gpReconcileDate')return gpReconcileOldFormModal();
+ const x=v17Ledger().find(row=>row.id===gpReconcileDateRowId);
+ if(!x)return gpReconcileOldFormModal();
+ return `<div class="modal-bg" data-backdrop><div class="modal gp-reconcile-modal"><div class="row between"><h2>Дата оплаты</h2><button type="button" class="btn ghost" data-gp-reconcile-close>✕</button></div><p class="muted">${escapeHtml(x.label)} · ${fmt(x.amount)}</p><form id="gp-reconcile-date-form"><label class="formfield">Когда покупка была оплачена?<input class="field" type="date" name="paidDate" required max="${escapeHtml(v17Today())}"></label><p class="muted small">Меняется только дата оплаты этой записи. Сумма, статус и привязка к празднику останутся прежними.</p><div class="modal-actions"><button type="button" class="btn secondary" data-gp-reconcile-close>Отмена</button><button type="submit" class="btn">Сохранить дату</button></div></form></div></div>`;
+};
+document.addEventListener('click',ev=>{
+ const b=ev.target.closest('[data-gp-reconcile-paydate],[data-gp-reconcile-close]');
+ if(!b)return;
+ ev.preventDefault();ev.stopImmediatePropagation();
+ if(b.hasAttribute('data-gp-reconcile-close')){modal=null;gpReconcileDateRowId='';draw();return}
+ gpReconcileDateRowId=b.dataset.gpReconcilePaydate;
+ modal='gpReconcileDate';draw();
+},true);
+document.addEventListener('submit',ev=>{
+ if(ev.target.id!=='gp-reconcile-date-form')return;
+ ev.preventDefault();ev.stopImmediatePropagation();
+ const value=String(new FormData(ev.target).get('paidDate')||'');
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return;
+ const id=gpReconcileDateRowId;
+ let record=null;
+ if(id.startsWith('shopping:'))record=byId('shopping',id.slice(9));
+ else if(id.startsWith('gift:'))record=byId('gifts',id.slice(5));
+ else if(id.startsWith('part:'))record=byId('bundleItems',id.slice(5));
+ else if(id.startsWith('handmade-extra:'))record=byId('gifts',id.slice(15));
+ if(!record)return;
+ record.purchasedAt=value;
+ gpReconcileDateRowId='';modal=null;draw();
+ window.v14Toast?.('Дата оплаты сохранена');
+},true);
 const v17CategoryLabel={buy:'Покупные подарки',bundle:'Элементы наборов',handmade:'Handmade (доп.)',materials:'Материалы',packaging:'Упаковка',delivery:'Доставка',other:'Другие расходы'};
 window.statisticsV12=function(){
  const years=v17Years();
@@ -2384,7 +2433,18 @@ window.statisticsV12=function(){
  const byEvent=new Map();for(const x of filterLedger){const key=x.eventId||'none',e=byId('events',key);if(!byEvent.has(key))byEvent.set(key,{name:e?.name||'Без события',total:0,count:0});const a=byEvent.get(key);a.total+=x.amount;a.count++}
  const byPeople=new Map();for(const x of stats.actual){const r=x.recipientIds.length?x.recipientIds:['unassigned'],share=x.amount/r.length;for(const pid of r){const name=byId('people',pid)?.name||'Без получателя';const old=byPeople.get(pid)||{name,total:0};old.total+=share;byPeople.set(pid,old)}}
  const records=filterLedger.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
- const statTiles=`<div class="v17-kpi-grid">${v17SummaryCard('Бюджет на '+year+' год',fmt(stats.budget),`По дате вручения: праздники ${fmt(stats.occasionBudget)} · отдельные подарки ${fmt(stats.separateGiftBudget)}`,'lavender')}${v17SummaryCard('Учтено на праздники '+year,fmt(stats.budgetSpent),'По году вручения, включая покупки в предыдущем году','sage')}${v17SummaryCard('Осталось в бюджете',fmt(stats.available),`Учтено в планах ${fmt(stats.budgetSpent)} (включая ранние покупки)`,'blue')}${v17SummaryCard('Потрачено в '+year+' году',fmt(stats.spent),'Все подтверждённые покупки по дате оплаты','sand')}${v17SummaryCard('Куплено без точной цены',fmt(stats.estimate),`${stats.uncertain.length} позиций (не входят в факт)`,'neutral')}${v17SummaryCard('Вручено подарков',`${stats.delivered} из ${stats.gifts.length}`,'В году вручения','neutral')}</div>`;
+ const statTiles=`<div class="v17-kpi-grid">${v17SummaryCard('Бюджет на '+year+' год',fmt(stats.budget),`По дате вручения: праздники ${fmt(stats.occasionBudget)} · отдельные подарки ${fmt(stats.separateGiftBudget)}`,'lavender')}${v17SummaryCard('Учтено на праздники '+year,fmt(stats.budgetSpent),'По году вручения, включая покупки в предыдущем году','sage')}${v17SummaryCard('Осталось в бюджете',fmt(stats.available),`Учтено в планах ${fmt(stats.budgetSpent)} (включая ранние покупки)`,'blue')}${v17SummaryCard('Потрачено в '+year+' году',fmt(stats.spent),'Дата оплаты определяет год; записи без неё требуют проверки','sand')}${v17SummaryCard('Куплено без точной цены',fmt(stats.estimate),`${stats.uncertain.length} позиций (не входят в факт)`,'neutral')}${v17SummaryCard('Вручено подарков',`${stats.delivered} из ${stats.gifts.length}`,'В году вручения','neutral')}</div>`;
+ const r=stats.reconciliation;
+ const discrepancy=v17Money(stats.budgetSpent-stats.spent);
+ const lineFor=x=>{
+   const paid=gpReconcilePaidDate(x),bad=!paid;
+   return `<div class="gp-reconcile-row"><div class="gp-reconcile-info"><strong>${escapeHtml(x.label||'Покупка')}</strong><small>Запись ${escapeHtml((v17CategoryLabel[x.category]||x.category||'расход'))} · ${paid?`оплачено ${escapeHtml(datefmt(paid))}`:'⚠ Дата оплаты не записана'}${x.date&&!paid?` · в исходной записи стоит ${escapeHtml(x.date)}`:''}</small></div><b>${fmt(x.amount)}</b>${bad&&gpReconcileEditableDate(x)?`<button class="btn secondary gp-reconcile-set-date" type="button" data-gp-reconcile-paydate="${escapeHtml(x.id)}">Указать дату оплаты</button>`:''}</div>`;
+ };
+ const onlyBudget= r.onlyBudget.length? r.onlyBudget.map(lineFor).join(''):'<p class="muted small">Таких позиций нет.</p>';
+ const onlyCash= r.onlyCash.length? r.onlyCash.map(lineFor).join(''):'<p class="muted small">Таких позиций нет.</p>';
+ const undatedMatching=r.matching.filter(x=>gpReconcileEditableDate(x));
+ const undatedMatchingHtml=undatedMatching.length?`<h4>Без даты оплаты, но уже включены в оба показателя</h4>${undatedMatching.map(lineFor).join('')}`:'';
+ const reconciliationHtml=`<details class="gp-reconcile-panel" ${Math.abs(discrepancy)>0.009?'open':''}><summary><strong>${Math.abs(discrepancy)>0.009?`Почему суммы различаются на ${fmt(Math.abs(discrepancy))}`:'Сверка праздничных и календарных расходов'}</strong><span class="muted small">Показать записи, из которых сложилась разница</span></summary><p class="muted small">«Учтено на праздники» — подтверждённые расходы, привязанные к планам года вручения. «Потрачено в году» — подтверждённые расходы, отнесённые приложением к календарному году оплаты. Разница не должна возникать, если это одни и те же покупки и все даты оплаты записаны правильно.</p><div class="gp-reconcile-sums"><div><span class="muted small">В бюджете, но не в расходах ${year}</span><strong>+ ${fmt(r.budgetOnlyTotal)}</strong></div><div><span class="muted small">В расходах ${year}, но не в бюджете</span><strong>− ${fmt(r.cashOnlyTotal)}</strong></div><div><span class="muted small">Разница</span><strong>${fmt(discrepancy)}</strong></div></div><h4>В бюджете ${year}, но не в календарных расходах</h4>${onlyBudget}<h4>В календарных расходах ${year}, но не в бюджете подарков</h4>${onlyCash}${undatedMatchingHtml}<p class="muted small">Если покупка уже совершена в ${year} году, но у неё не записана дата оплаты, укажи настоящую дату — приложение пересчитает обе суммы. Непривязанные покупки остаются в календарных расходах, но не уменьшают праздничный бюджет.</p></details>`;
  const nextFunded=fundedYears.find(y=>y!==year && years.includes(y));
  const yearNote=nextFunded ? `<div class="gp-budget-year-hint">Сейчас выбран <strong>${year} год</strong>. Бюджеты привязаны к году вручения, а не к дате праздника. В ${nextFunded} году запланировано <strong>${fmt(v17StatsData(nextFunded).occasionBudget)}</strong>. <button class="linklike" type="button" data-gp-stats-jump="${nextFunded}">Показать ${nextFunded} год</button></div>` : '';
  const sourceRows=records.map(x=>`<tr><td>${escapeHtml(x.date||'—')}</td><td>${escapeHtml(x.label)}<small>${escapeHtml(v17CategoryLabel[x.category]||x.category)}</small></td><td>${escapeHtml(byId('events',x.eventId)?.name||'—')}</td><td class="number">${fmt(x.amount)}${x.origin==='extra'?` <button class="v17-link" type="button" data-v17-edit-expense="${x.id.slice(6)}" aria-label="Редактировать расход">✎</button> <button class="v17-link" type="button" data-v17-del-expense="${x.id.slice(6)}" aria-label="Удалить расход">×</button>`:''}</td></tr>`).join('');
@@ -2402,7 +2462,7 @@ window.statisticsV12=function(){
  <section class="v17-finance-section v17-ledger"><div class="row between"><h3>Реестр подтверждённых расходов</h3><button class="btn secondary" data-v17-add-expense>+ Расход</button></div><p class="muted small">Показывает источник каждой суммы; бюджеты не подменяют реальные расходы. Дополнительные траты можно записать вручную.</p><div class="v17-table-wrap"><table><thead><tr><th>Дата</th><th>Расход</th><th>Событие</th><th>Сумма</th></tr></thead><tbody>${sourceRows||'<tr><td colspan="4">Пока нет подтверждённых расходов</td></tr>'}</tbody></table></div></section>
  <section class="v17-finance-section"><h3>Данные требуют уточнения</h3>${stats.uncertain.length?`<p class="muted">${stats.uncertain.length} покупки отмечены выполненными, но фактическая цена не указана. Эти суммы исключены из подтверждённых расходов.</p>${stats.uncertain.map(x=>`<div class="v17-unpriced">${escapeHtml(x.label)} · оценка ${fmt(x.amount)}</div>`).join('')}`:'<p class="muted">Нет отмеченных покупок с неизвестной фактической стоимостью.</p>'}</section>
  </div>`;
- return layout('Статистика','Подтверждённые расходы, бюджеты, подарки и динамика без смешения факта и оценок.',`<div class="v17-stat-top"><div class="formfield"><label>Год вручения / расходов</label><select class="field" data-v17-year>${years.map(y=>`<option value="${y}" ${y===year?'selected':''}>${y}</option>`).join('')}</select></div><div class="formfield"><label>Получатель</label><select class="field" data-v17-person><option value="all">Все</option>${db.people.map(p=>`<option value="${p.id}" ${v17FinancePerson===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}</select></div><div class="formfield"><label>Событие</label><select class="field" data-v17-event><option value="all">Все</option>${db.events.map(e=>`<option value="${e.id}" ${v17FinanceEvent===e.id?'selected':''}>${escapeHtml(e.name)}</option>`).join('')}</select></div></div><p class="v19-budget-explain muted small">Бюджет праздника относится к году фактического вручения, указанному в плане, а расходы по календарю — к году покупки. Например, Новый год 2027 с вручением 27 декабря 2026 года входит в бюджет 2026 года. Покупки учитываются в нём один раз, даже если были сделаны раньше. Если у праздника задан общий бюджет, лимиты входящих в него подарков не прибавляются второй раз.</p>${yearNote}${statTiles}${panels}<p class="muted small">Фильтры «Получатель» и «Событие» применяются к детализации расходов; общие показатели наверху показывают весь год. Ожидаемые будущие покупки: ${fmt(stats.pendingTotal)}. Если расход ещё не привязан ни к одному плану, он отображается в календарном году оплаты, но не уменьшает праздничный бюджет. Каждый материал и элемент набора учитывается один раз.</p>`,`<button class="btn secondary" data-v17-add-expense>+ Отдельный расход</button>`);
+ return layout('Статистика','Подтверждённые расходы, бюджеты, подарки и динамика без смешения факта и оценок.',`<div class="v17-stat-top"><div class="formfield"><label>Год вручения / расходов</label><select class="field" data-v17-year>${years.map(y=>`<option value="${y}" ${y===year?'selected':''}>${y}</option>`).join('')}</select></div><div class="formfield"><label>Получатель</label><select class="field" data-v17-person><option value="all">Все</option>${db.people.map(p=>`<option value="${p.id}" ${v17FinancePerson===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}</select></div><div class="formfield"><label>Событие</label><select class="field" data-v17-event><option value="all">Все</option>${db.events.map(e=>`<option value="${e.id}" ${v17FinanceEvent===e.id?'selected':''}>${escapeHtml(e.name)}</option>`).join('')}</select></div></div><p class="v19-budget-explain muted small">Бюджет праздника относится к году фактического вручения, указанному в плане, а расходы по календарю — к году покупки. Например, Новый год 2027 с вручением 27 декабря 2026 года входит в бюджет 2026 года. Покупки учитываются в нём один раз, даже если были сделаны раньше. Если у праздника задан общий бюджет, лимиты входящих в него подарков не прибавляются второй раз.</p>${yearNote}${statTiles}${reconciliationHtml}${panels}<p class="muted small">Фильтры «Получатель» и «Событие» применяются к детализации расходов; общие показатели наверху показывают весь год. Ожидаемые будущие покупки: ${fmt(stats.pendingTotal)}. Если расход ещё не привязан ни к одному плану, он отображается в календарном году оплаты, но не уменьшает праздничный бюджет. Каждый материал и элемент набора учитывается один раз.</p>`,`<button class="btn secondary" data-v17-add-expense>+ Отдельный расход</button>`);
 };
 
 // All chosen recipients of the annual plan remain visible even before gifts are assigned.
@@ -3300,5 +3360,24 @@ body.dark .gp-handmade-status.is-ready{background:#234033;border-color:#35664f}
 .gp-budget-year-hint{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:13px 16px;margin:8px 0 18px;line-height:1.5;font-size:13px;color:var(--muted)}
 .gp-budget-year-hint .linklike{font:inherit;font-weight:700;color:var(--accent)}
 @media(max-width:700px){.gp-simple-plan-link>.btn{width:100%!important}.gp-budget-year-hint{padding:12px}}
+</style>
+<style id="gp-reconcile-finance-style">
+.gp-reconcile-panel{margin:18px 0 25px;padding:18px 20px;border:1px solid var(--line);background:var(--panel);border-radius:18px;min-width:0}
+.gp-reconcile-panel summary{display:flex;gap:8px 22px;align-items:center;justify-content:space-between;flex-wrap:wrap;color:var(--text);cursor:pointer}
+.gp-reconcile-panel summary strong{font-size:16px}
+.gp-reconcile-panel>p{line-height:1.55}
+.gp-reconcile-sums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:15px 0}
+.gp-reconcile-sums>div{border-radius:13px;padding:11px 14px;background:var(--panel2);min-width:0}
+.gp-reconcile-sums span,.gp-reconcile-sums strong{display:block}
+.gp-reconcile-sums strong{font-size:20px;margin-top:4px}
+.gp-reconcile-panel h4{margin:18px 0 8px}
+.gp-reconcile-row{display:flex;gap:12px;align-items:center;border-top:1px solid var(--line);padding:12px 0;min-width:0}
+.gp-reconcile-info{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px}
+.gp-reconcile-info strong{overflow-wrap:anywhere}
+.gp-reconcile-info small{color:var(--muted);line-height:1.45}
+.gp-reconcile-row>b{white-space:nowrap}
+.gp-reconcile-set-date{font-size:12px;white-space:normal;flex-shrink:0}
+.gp-reconcile-modal{max-width:min(460px,96vw)}
+@media(max-width:690px){.gp-reconcile-sums{grid-template-columns:1fr}.gp-reconcile-row{flex-wrap:wrap}.gp-reconcile-set-date{width:100%}.gp-reconcile-panel{padding:14px}}
 </style>
 <script type="module" src="./firebase-sync.js"></script></body></html>
